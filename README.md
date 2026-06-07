@@ -6,7 +6,10 @@ Interactive Goodhart demo for the **Self Improving AI (SIA) Agents** hackathon.
 - **Repository:** https://github.com/skyzer/self-improving-agent-verifier-optimizer
 - **Temporary local/tailnet demo:** https://as-mac-mini.cobbler-procyon.ts.net/verifier/
 - **Submission tracks:** Research Track, Applied AI Track
-- **Additional photo:** https://github.com/skyzer/self-improving-agent-verifier-optimizer/blob/main/media/verifier-lab-main.png
+- **Additional photos:**
+  - Overfit failure: https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/01-overfit-goodhart-gap.png
+  - Robust mitigation: https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/02-robust-small-gap.png
+  - Hidden false-premise scenario: https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/03-aeo-false-promise-robust.png
 
 ## What it shows
 
@@ -144,7 +147,10 @@ The browser demo uses the **Handhold Minimal** design system: black text on whit
 - `ux-fit-options.html` — compact layout alternatives.
 - `Dockerfile` / `docker-compose.yml` — local containerized serving.
 - `SUBMISSION.md` — Oatmeal submission copy.
-- `media/verifier-lab-main.png` — public screenshot/additional photo for judging materials.
+- `media/01-overfit-goodhart-gap.png` — screenshot showing a high score but failed hidden reality check.
+- `media/02-robust-small-gap.png` — screenshot showing the robust verifier with a small gap.
+- `media/03-aeo-false-promise-robust.png` — screenshot showing a hidden false-premise scenario.
+- `media/verifier-lab-main.png` — earlier public screenshot/additional photo.
 
 ## License
 

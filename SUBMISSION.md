@@ -6,7 +6,20 @@ Verifier Design Lab for SIA Agents
 
 ## One-line summary
 
-An interactive Goodhart lab showing how self-improving agents can optimize weak verifier scores while failing hidden reality checks, and how robust verifier design mitigates the failure.
+An interactive demo showing how self-improving AI can learn to pass the wrong test, and how better evaluation catches the problem.
+
+## Alternative short summaries
+
+1. An interactive demo showing why self-improving AI needs strong tests: weak checks can be passed without producing genuinely better answers.
+2. A hands-on lab where an AI optimizer learns to game bad scoring rules, then shows how better hidden checks catch the failure.
+3. A visual demo of the core SIA safety lesson: if you reward the wrong thing, a self-improving agent gets better at the wrong thing.
+4. An interactive verifier lab for SIA agents, showing how better evaluation keeps self-improvement aligned with real answer quality.
+5. A compact demo showing the difference between “looks good to the scoring rule” and “actually works on hidden checks.”
+6. A browser-based lab for testing SIA agents against weak metrics, overfitting, and hidden evaluation failures.
+7. A practical demo for SIA agents: weak verifiers reward shortcuts, while robust verifiers select answers that hold up on hidden tests.
+8. A simple interactive story about self-improving AI: bad tests create fake progress, better tests reveal real progress.
+9. A verifier/optimizer playground showing how AI systems can chase scores instead of quality, and how to design checks that resist that.
+10. A public demo that turns the SIA verifier-design problem into a clickable lab with scenarios, scores, hidden checks, and failure cases.
 
 ## Description
 
@@ -30,11 +43,25 @@ https://as-mac-mini.cobbler-procyon.ts.net/verifier/
 
 This is a tailnet-hosted fallback and should not be used as the only judge-facing URL.
 
-## Additional photo
+## Additional photos
 
-https://github.com/skyzer/self-improving-agent-verifier-optimizer/blob/main/media/verifier-lab-main.png
+Overfit failure / large gap:
 
-The screenshot shows the public GitHub Pages demo with the Robust verifier selected, including visible-to-optimizer verifier score, hidden reality score, and Goodhart gap labels.
+https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/01-overfit-goodhart-gap.png
+
+Robust verifier / small gap:
+
+https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/02-robust-small-gap.png
+
+Hidden false-premise scenario:
+
+https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/03-aeo-false-promise-robust.png
+
+Earlier public screenshot:
+
+https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/verifier-lab-main.png
+
+The screenshots show the public GitHub Pages demo in multiple states: a weak verifier producing a high score but bad hidden reality score, the Robust verifier producing a small gap, and a hidden Answer Engine Optimization false-premise scenario.
 
 ## Suggested video/photo description
 
