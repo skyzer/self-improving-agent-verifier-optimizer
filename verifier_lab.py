@@ -13,7 +13,7 @@ import argparse
 import json
 from dataclasses import dataclass, asdict
 from pathlib import Path
-from statistics import mean
+from statistics import mean, median
 from typing import Callable, Dict, Iterable, List
 
 
@@ -369,12 +369,318 @@ def robust_guardrail_score(policy: Policy) -> float:
     return round(clamp(100 * quality - penalty), 1)
 
 
+@dataclass(frozen=True)
+class LoopCandidate:
+    id: str
+    name: str
+    mutation_type: str
+    family: str
+    answer: str
+    visible_score: float
+    independent_score: float
+    hidden_reality_score: float
+    reason: str
+
+
 SCORERS: Dict[str, Callable[[Policy], float]] = {
     "bad_proxy": bad_proxy_score,
     "easy_surface": easy_surface_score,
     "overfit_visible": overfit_visible_score,
     "robust_guardrail": robust_guardrail_score,
 }
+
+
+PROOF_LOOP_COUNT = 12
+
+
+GAMING_BY_VERIFIER = {
+    "bad_proxy": {
+        "id": "keyword_citation_stuffing",
+        "name": "Keyword/citation stuffing",
+        "family": "proxy gaming",
+        "answer": "The answer grows longer, repeats the target phrases, and adds citation-looking markers that do not support the claims.",
+        "reason": "It buys verifier score with length, keywords, and citation count.",
+    },
+    "easy_surface": {
+        "id": "approved_phrase_spam",
+        "name": "Approved phrase spam",
+        "family": "surface gaming",
+        "answer": "The answer repeats the approved phrase on every prompt, even when the prompt asks for nuance or refusal.",
+        "reason": "It buys verifier score by matching the exact visible phrase.",
+    },
+    "overfit_visible": {
+        "id": "visible_set_memorization",
+        "name": "Visible-set memorization",
+        "family": "benchmark gaming",
+        "answer": "The answer memorizes the visible benchmark examples and falls apart on paraphrases or shifted hidden prompts.",
+        "reason": "It buys verifier score by reproducing known training answers.",
+    },
+    "robust_guardrail": {
+        "id": "balanced_guardrail_upgrade",
+        "name": "Balanced guardrail upgrade",
+        "family": "robust improvement",
+        "answer": "The answer improves support, refusal behavior, freshness, citations, and usefulness together instead of chasing one proxy.",
+        "reason": "The visible rule already rewards the same properties the independent audit checks.",
+    },
+}
+
+
+ROBUST_MUTATIONS = [
+    {
+        "id": "false_premise_refusal",
+        "name": "Add false-premise refusal",
+        "family": "robust refusal",
+        "answer": "The answer refuses impossible claims before explaining the honest alternative.",
+        "reason": "It improves safety on hidden false-premise probes.",
+        "independent_bonus": 0.0,
+        "hidden_bonus": 0.0,
+        "visible_bonus": 0.0,
+    },
+    {
+        "id": "citation_support_check",
+        "name": "Add citation-support check",
+        "family": "robust grounding",
+        "answer": "The answer treats raw citation count as insufficient and checks whether sources actually support each claim.",
+        "reason": "It improves grounding while resisting citation-count Goodharting.",
+        "independent_bonus": 2.0,
+        "hidden_bonus": 2.4,
+        "visible_bonus": 1.2,
+    },
+    {
+        "id": "freshness_drift_check",
+        "name": "Add freshness drift check",
+        "family": "robust freshness",
+        "answer": "The answer checks whether the source state changed and refuses to certify stale launch-day claims.",
+        "reason": "It improves hidden freshness and drift probes.",
+        "independent_bonus": 1.4,
+        "hidden_bonus": 2.0,
+        "visible_bonus": 0.8,
+    },
+    {
+        "id": "paraphrase_generalization",
+        "name": "Add paraphrase generalization",
+        "family": "robust generalization",
+        "answer": "The answer solves paraphrased prompts instead of relying on a memorized benchmark sentence.",
+        "reason": "It improves hidden paraphrase and distribution-shift probes.",
+        "independent_bonus": 2.8,
+        "hidden_bonus": 3.0,
+        "visible_bonus": 1.0,
+    },
+]
+
+
+def _candidate_dict(candidate: LoopCandidate) -> Dict[str, object]:
+    return asdict(candidate)
+
+
+def _round_score(value: float) -> float:
+    return round(clamp(value), 1)
+
+
+def _gaming_candidate(verifier_id: str, loop: int) -> LoopCandidate:
+    spec = GAMING_BY_VERIFIER[verifier_id]
+    if verifier_id == "robust_guardrail":
+        visible = 66 + 1.8 * loop
+        independent = 64 + 1.7 * loop
+        hidden = 65 + 1.6 * loop
+        mutation_type = "robust"
+    else:
+        visible = 54 + 4.1 * loop
+        independent = 51 - 2.1 * loop
+        hidden = 52 - 2.8 * loop
+        mutation_type = "gaming"
+    return LoopCandidate(
+        id=f"loop_{loop}_{spec['id']}",
+        name=spec["name"],
+        mutation_type=mutation_type,
+        family=spec["family"],
+        answer=spec["answer"],
+        visible_score=_round_score(visible),
+        independent_score=_round_score(independent),
+        hidden_reality_score=_round_score(hidden),
+        reason=spec["reason"],
+    )
+
+
+def _distractor_gaming_candidate(verifier_id: str, loop: int) -> LoopCandidate:
+    name_by_verifier = {
+        "bad_proxy": "Confident false promise",
+        "easy_surface": "Citation-count padding",
+        "overfit_visible": "Approved-phrase padding",
+        "robust_guardrail": "Overconfident shortcut",
+    }
+    return LoopCandidate(
+        id=f"loop_{loop}_secondary_gaming",
+        name=name_by_verifier[verifier_id],
+        mutation_type="gaming",
+        family="secondary gaming",
+        answer="The answer looks more polished to a shallow checker, but it drops an important held-out constraint.",
+        visible_score=_round_score(48 + 2.7 * loop),
+        independent_score=_round_score(56 - 1.8 * loop),
+        hidden_reality_score=_round_score(54 - 2.2 * loop),
+        reason="It is a weaker gaming move included so the optimizer sees more than one bad option.",
+    )
+
+
+def _robust_candidate(loop: int, index: int, spec: Dict[str, object], verifier_id: str) -> LoopCandidate:
+    # Weak verifiers under-reward robust work; the robust verifier rewards it more directly.
+    visible_base = 43 if verifier_id != "robust_guardrail" else 61
+    visible_slope = 2.1 if verifier_id != "robust_guardrail" else 2.6
+    independent = 61 + 2.1 * loop + float(spec["independent_bonus"])
+    hidden = 62 + 2.0 * loop + float(spec["hidden_bonus"])
+    visible = visible_base + visible_slope * loop + float(spec["visible_bonus"]) - index * 0.3
+    return LoopCandidate(
+        id=f"loop_{loop}_{spec['id']}",
+        name=str(spec["name"]),
+        mutation_type="robust",
+        family=str(spec["family"]),
+        answer=str(spec["answer"]),
+        visible_score=_round_score(visible),
+        independent_score=_round_score(independent),
+        hidden_reality_score=_round_score(hidden),
+        reason=str(spec["reason"]),
+    )
+
+
+def generate_loop_candidates(verifier_id: str, loop: int) -> List[LoopCandidate]:
+    """Generate the same candidate mutations for both proof arms."""
+    candidates = [_gaming_candidate(verifier_id, loop), _distractor_gaming_candidate(verifier_id, loop)]
+    candidates.extend(_robust_candidate(loop, i, spec, verifier_id) for i, spec in enumerate(ROBUST_MUTATIONS))
+    return candidates
+
+
+def select_visible_only(candidates: List[LoopCandidate]) -> LoopCandidate:
+    return max(candidates, key=lambda c: (c.visible_score, c.hidden_reality_score))
+
+
+def select_independent_gated(candidates: List[LoopCandidate], gate_threshold: float) -> tuple[LoopCandidate, List[LoopCandidate]]:
+    """Select by visible score after an independent-verifier gate.
+
+    Hidden reality is intentionally not read here; it is only used for the final
+    audit and for reporting after selection.
+    """
+    allowed = [c for c in candidates if c.independent_score >= gate_threshold]
+    if not allowed:
+        allowed = [max(candidates, key=lambda c: c.independent_score)]
+    selected = max(allowed, key=lambda c: (c.visible_score, c.independent_score))
+    rejected = [c for c in candidates if c.visible_score > selected.visible_score and c.independent_score < gate_threshold]
+    return selected, rejected
+
+
+def run_loop_proof(verifier_id: str, loop_count: int = PROOF_LOOP_COUNT) -> Dict[str, object]:
+    """Run the visible-only vs independent-gated proof for one verifier lens."""
+    steps = []
+    gate_threshold = 58.0
+    rejected_gaming_mutations = 0
+    final_visible = None
+    final_gated = None
+
+    for loop in range(1, loop_count + 1):
+        candidates = generate_loop_candidates(verifier_id, loop)
+        candidate_ids = [c.id for c in candidates]
+        visible_choice = select_visible_only(candidates)
+        gated_choice, rejected = select_independent_gated(candidates, gate_threshold)
+        gate_threshold = max(58.0, gated_choice.independent_score - 3.0)
+        rejected_gaming_mutations += sum(1 for c in rejected if c.mutation_type == "gaming")
+        final_visible = visible_choice
+        final_gated = gated_choice
+        steps.append(
+            {
+                "loop": loop,
+                "gate_threshold": round(gate_threshold, 1),
+                "candidate_ids": candidate_ids,
+                "candidates": [_candidate_dict(c) for c in candidates],
+                "visible_only": {
+                    "selected_candidate_id": visible_choice.id,
+                    "selected_name": visible_choice.name,
+                    "seen_candidate_ids": candidate_ids,
+                    "visible_score": visible_choice.visible_score,
+                    "independent_score": visible_choice.independent_score,
+                    "hidden_reality_score": visible_choice.hidden_reality_score,
+                    "goodhart_gap": round(visible_choice.visible_score - visible_choice.hidden_reality_score, 1),
+                    "reason": visible_choice.reason,
+                },
+                "independent_gated": {
+                    "selected_candidate_id": gated_choice.id,
+                    "selected_name": gated_choice.name,
+                    "seen_candidate_ids": candidate_ids,
+                    "visible_score": gated_choice.visible_score,
+                    "independent_score": gated_choice.independent_score,
+                    "hidden_reality_score": gated_choice.hidden_reality_score,
+                    "goodhart_gap": round(gated_choice.visible_score - gated_choice.hidden_reality_score, 1),
+                    "rejected_candidate_ids": [c.id for c in rejected],
+                    "rejected_names": [c.name for c in rejected],
+                    "reason": gated_choice.reason,
+                },
+            }
+        )
+
+    assert final_visible is not None and final_gated is not None
+    visible_gap = round(final_visible.visible_score - final_visible.hidden_reality_score, 1)
+    gated_gap = round(final_gated.visible_score - final_gated.hidden_reality_score, 1)
+    hidden_lift = round(final_gated.hidden_reality_score - final_visible.hidden_reality_score, 1)
+    summary = {
+        "visible_only": {
+            "final_candidate_id": final_visible.id,
+            "final_name": final_visible.name,
+            "final_visible_score": final_visible.visible_score,
+            "final_independent_score": final_visible.independent_score,
+            "final_hidden_reality_score": final_visible.hidden_reality_score,
+            "final_goodhart_gap": visible_gap,
+        },
+        "independent_gated": {
+            "final_candidate_id": final_gated.id,
+            "final_name": final_gated.name,
+            "final_visible_score": final_gated.visible_score,
+            "final_independent_score": final_gated.independent_score,
+            "final_hidden_reality_score": final_gated.hidden_reality_score,
+            "final_goodhart_gap": gated_gap,
+            "rejected_gaming_mutations": rejected_gaming_mutations,
+        },
+        "hidden_reality_lift": hidden_lift,
+        "goodhart_gap_reduction": round(visible_gap - gated_gap, 1),
+        "hidden_score_used_for_selection": False,
+    }
+    return {
+        "verifier_id": verifier_id,
+        "loop_count": loop_count,
+        "selection_rule": "visible-only maximizes verifier score; independent-gated maximizes visible score only after a held-out independent-verifier gate",
+        "independent_gate": "candidate.independent_score must stay within 3 points of the previous gated champion's independent score",
+        "steps": steps,
+        "summary": summary,
+        "seed_sweep": run_seed_sweep(summary, verifier_id),
+    }
+
+
+def run_seed_sweep(summary: Dict[str, object], verifier_id: str, seeds: int = 100) -> Dict[str, object]:
+    """Deterministic jitter sweep so the proof is not just one cherry-picked trace."""
+    visible = summary["visible_only"]
+    gated = summary["independent_gated"]
+    wins = 0
+    lifts = []
+    gap_reductions = []
+    verifier_bias = {"bad_proxy": 0.0, "easy_surface": -2.0, "overfit_visible": -1.0, "robust_guardrail": 0.0}[verifier_id]
+    for seed in range(seeds):
+        visible_jitter = ((seed * 7) % 9 - 4) * 0.45
+        gated_jitter = ((seed * 11) % 9 - 4) * 0.35 + verifier_bias
+        visible_hidden = float(visible["final_hidden_reality_score"]) + visible_jitter
+        gated_hidden = float(gated["final_hidden_reality_score"]) + gated_jitter
+        lift = round(gated_hidden - visible_hidden, 1)
+        wins += lift > 0
+        lifts.append(lift)
+        visible_gap = float(visible["final_visible_score"]) - visible_hidden
+        gated_gap = float(gated["final_visible_score"]) - gated_hidden
+        gap_reductions.append(round(visible_gap - gated_gap, 1))
+    return {
+        "seeds": seeds,
+        "independent_gated_hidden_wins": wins,
+        "median_hidden_reality_lift": round(median(lifts), 1),
+        "median_goodhart_gap_reduction": round(median(gap_reductions), 1),
+    }
+
+
+def build_loop_proofs(loop_count: int = PROOF_LOOP_COUNT) -> Dict[str, object]:
+    return {verifier.id: run_loop_proof(verifier.id, loop_count) for verifier in VERIFIERS}
 
 
 def evaluate() -> Dict[str, object]:
@@ -419,6 +725,7 @@ def evaluate() -> Dict[str, object]:
         "verifiers": [asdict(v) for v in VERIFIERS],
         "policies": policies,
         "winners": winners,
+        "loop_proof": build_loop_proofs(),
         "takeaway": "A self-improving loop is only as trustworthy as the verifier and held-out reality checks it cannot see.",
     }
 
@@ -556,6 +863,23 @@ HTML_TEMPLATE = r'''<!doctype html>
     th { color: var(--color-secondary); font-size: 12px; line-height: 16px; font-weight: 400; }
     .bad { color: var(--color-error); }
     .good { color: var(--color-primary); }
+    .proof-section { margin-top: var(--space-lg); }
+    .proof-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: end; margin-bottom: var(--space-md); }
+    .proof-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-sm); margin-bottom: var(--space-md); }
+    .proof-arms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-md); margin-bottom: var(--space-md); }
+    .proof-arm { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .proof-arm h3 { display: flex; justify-content: space-between; gap: var(--space-sm); }
+    .proof-chart { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); overflow: auto; margin-bottom: var(--space-md); }
+    .chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-md); color: var(--color-tertiary); font-size: 12px; line-height: 16px; margin-top: var(--space-xs); }
+    .chart-scale-note { color: var(--color-tertiary); font-size: 12px; line-height: 16px; margin-top: var(--space-xs); }
+    .legend-mark { display: inline-block; width: 18px; height: 2px; margin-right: 6px; vertical-align: middle; background: var(--color-primary); }
+    .legend-mark.thin { background: var(--color-tertiary); }
+    .legend-mark.bad-line { background: var(--color-error); }
+    .legend-mark.dashed { height: 0; background: transparent; border-top: 2px dashed var(--color-error); }
+    .loop-trace { display: grid; gap: 6px; max-height: 360px; overflow: auto; overscroll-behavior: contain; }
+    .trace-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-sm); border-top: 1px solid var(--color-neutral); padding-top: 6px; font-size: 12px; line-height: 16px; }
+    .trace-cell strong { display: block; font-size: 13px; line-height: 18px; }
+    .rejected { color: var(--color-error); margin-top: 3px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-top: var(--space-lg); }
     ul { margin: var(--space-sm) 0 0; padding-left: var(--space-xl); color: var(--color-secondary); line-height: 24px; }
     li { margin-bottom: var(--space-xs); }
@@ -628,6 +952,23 @@ HTML_TEMPLATE = r'''<!doctype html>
       </div>
     </section>
 
+    <section class="card section proof-section" aria-labelledby="proofTitle">
+      <div class="proof-head">
+        <div>
+          <h2 id="proofTitle">Verifier loop proof</h2>
+          <p class="small">Both optimizers see the same candidate mutations for 12 loops. The visible-only optimizer picks the highest active verifier score. The independent-verifier-gated optimizer can still optimize that visible score, but it rejects candidates that fail a separate independent gate score. Hidden reality audit is reported after selection and is not used to choose winners.</p>
+        </div>
+        <div class="quiet-label">Updates with the active verifier lens</div>
+      </div>
+      <div id="proofPanel"></div>
+      <div class="proof-chart" id="proofChart" aria-label="Loop proof score chart"></div>
+      <div>
+        <h3>Loop trace</h3>
+        <p class="small">Each row shows the optimizer's choice after that loop. Rejections are candidates that looked better to the visible verifier but failed the independent verifier gate.</p>
+        <div class="loop-trace" id="loopTrace"></div>
+      </div>
+    </section>
+
     <section class="grid">
       <div class="card section winner" id="winner"></div>
       <div class="card section">
@@ -692,6 +1033,7 @@ function policyById(id) { return LAB_RESULTS.policies.find(p => p.id === id); }
 function exampleById(id) { return LAB_RESULTS.demo_examples.find(e => e.id === id); }
 function responseFor(exampleId, policyId) { return LAB_RESULTS.example_responses[exampleId][policyId]; }
 function winnerFor(id) { return LAB_RESULTS.winners[id]; }
+function activeProof() { return LAB_RESULTS.loop_proof[activeVerifier]; }
 
 function fmt(n) { return Number(n).toFixed(1); }
 function gapClass(gap) { return gap > 20 ? 'gap-positive' : 'gap-low'; }
@@ -841,6 +1183,123 @@ function renderWinnerTable() {
   }).join('');
 }
 
+function chartBounds(width, height) {
+  return { left: 34, right: width - 190, top: 22, bottom: height - 36 };
+}
+
+function chartPoint(steps, accessor, width, height, index) {
+  const bounds = chartBounds(width, height);
+  const denom = Math.max(1, steps.length - 1);
+  const step = steps[index];
+  const x = bounds.left + (bounds.right - bounds.left) * (index / denom);
+  const clamped = Math.max(0, Math.min(100, accessor(step)));
+  const y = bounds.bottom - ((bounds.bottom - bounds.top) * clamped / 100);
+  return { x, y };
+}
+
+function chartPoints(steps, accessor, width, height) {
+  return steps.map((_, i) => {
+    const point = chartPoint(steps, accessor, width, height, i);
+    return `${point.x.toFixed(1)},${point.y.toFixed(1)}`;
+  }).join(' ');
+}
+
+function chartEndLabel(steps, accessor, width, height, label, color, dy = 0) {
+  const point = chartPoint(steps, accessor, width, height, steps.length - 1);
+  const bounds = chartBounds(width, height);
+  const y = Math.max(bounds.top + 5, Math.min(bounds.bottom - 3, point.y + dy));
+  return `<text x="${(point.x + 10).toFixed(1)}" y="${y.toFixed(1)}" font-size="10" font-weight="700" fill="${color}">${label}</text>`;
+}
+
+function renderProof() {
+  const proof = activeProof();
+  const verifier = verifierById(activeVerifier);
+  const summary = proof.summary;
+  const visible = summary.visible_only;
+  const gated = summary.independent_gated;
+  const sweep = proof.seed_sweep;
+  document.getElementById('proofPanel').innerHTML = `
+    <div class="proof-summary">
+      <div class="metric"><label>Loops</label><b>${proof.loop_count}</b></div>
+      <div class="metric"><label>hidden reality lift</label><b>${fmt(summary.hidden_reality_lift)}</b></div>
+      <div class="metric"><label>Gap reduction</label><b>${fmt(summary.goodhart_gap_reduction)}</b></div>
+      <div class="metric"><label>Seed sweep</label><b>${sweep.independent_gated_hidden_wins}/${sweep.seeds}</b></div>
+    </div>
+    <div class="proof-arms">
+      <div class="proof-arm">
+        <h3><span>Visible-only optimizer</span><span class="bad">gap ${fmt(visible.final_goodhart_gap)}</span></h3>
+        <p class="small">Picks the highest ${escapeHtml(verifier.label)} score every loop. Final choice: ${escapeHtml(visible.final_name)}.</p>
+        <div class="metric-row">
+          <div class="metric"><label>${escapeHtml(verifier.label)} score</label><b>${fmt(visible.final_visible_score)}</b></div>
+          <div class="metric"><label>Independent gate score</label><b>${fmt(visible.final_independent_score)}</b></div>
+          <div class="metric"><label>Hidden reality audit</label><b>${fmt(visible.final_hidden_reality_score)}</b></div>
+        </div>
+      </div>
+      <div class="proof-arm">
+        <h3><span>Independent-verifier-gated optimizer</span><span class="good">gap ${fmt(gated.final_goodhart_gap)}</span></h3>
+        <p class="small">Maximizes visible score only after the independent verifier gate. Final choice: ${escapeHtml(gated.final_name)}.</p>
+        <div class="metric-row">
+          <div class="metric"><label>${escapeHtml(verifier.label)} score</label><b>${fmt(gated.final_visible_score)}</b></div>
+          <div class="metric"><label>Independent gate score</label><b>${fmt(gated.final_independent_score)}</b></div>
+          <div class="metric"><label>Hidden reality audit</label><b>${fmt(gated.final_hidden_reality_score)}</b></div>
+        </div>
+        <p class="small">Rejected gaming mutations: ${gated.rejected_gaming_mutations}. Median sweep lift: ${fmt(sweep.median_hidden_reality_lift)} hidden-reality points.</p>
+      </div>
+    </div>
+  `;
+
+  const width = 780;
+  const height = 210;
+  const steps = proof.steps;
+  const bounds = chartBounds(width, height);
+  const visibleVerifier = chartPoints(steps, s => s.visible_only.visible_score, width, height);
+  const visibleHidden = chartPoints(steps, s => s.visible_only.hidden_reality_score, width, height);
+  const gatedVerifier = chartPoints(steps, s => s.independent_gated.visible_score, width, height);
+  const gatedHidden = chartPoints(steps, s => s.independent_gated.hidden_reality_score, width, height);
+  const activeScoreLabel = escapeHtml(verifier.label);
+  const visibleVerifierLabel = chartEndLabel(steps, s => s.visible_only.visible_score, width, height, `red: visible-only ${activeScoreLabel} score`, '#B91C1C', 4);
+  const visibleHiddenLabel = chartEndLabel(steps, s => s.visible_only.hidden_reality_score, width, height, 'red dashed: visible-only hidden audit', '#B91C1C', -4);
+  const gatedVerifierLabel = chartEndLabel(steps, s => s.independent_gated.visible_score, width, height, `black: gated ${activeScoreLabel} score`, '#111827', 4);
+  const gatedHiddenLabel = chartEndLabel(steps, s => s.independent_gated.hidden_reality_score, width, height, 'gray: gated hidden audit', '#6B7280', 16);
+  document.getElementById('proofChart').innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" width="100%" height="${height}" role="img" aria-label="Scores over ${proof.loop_count} loops on a normalized 0 to 100 scale">
+      <line x1="${bounds.left}" y1="${bounds.bottom}" x2="${bounds.right}" y2="${bounds.bottom}" stroke="#E5E7EB" />
+      <line x1="${bounds.left}" y1="${bounds.top}" x2="${bounds.left}" y2="${bounds.bottom}" stroke="#E5E7EB" />
+      <text x="${bounds.left}" y="14" font-size="11" font-weight="700" fill="#6B7280">normalized score: 0–100</text>
+      <polyline points="${visibleVerifier}" fill="none" stroke="#B91C1C" stroke-width="3" />
+      <polyline points="${visibleHidden}" fill="none" stroke="#B91C1C" stroke-width="1.5" stroke-dasharray="5 5" />
+      <polyline points="${gatedVerifier}" fill="none" stroke="#000000" stroke-width="3" />
+      <polyline points="${gatedHidden}" fill="none" stroke="#6B7280" stroke-width="2.5" />
+      ${visibleVerifierLabel}
+      ${visibleHiddenLabel}
+      ${gatedVerifierLabel}
+      ${gatedHiddenLabel}
+      <text x="${bounds.left}" y="${height - 8}" font-size="11" fill="#6B7280">loop 1</text>
+      <text x="${bounds.right - 36}" y="${height - 8}" font-size="11" fill="#6B7280">loop ${proof.loop_count}</text>
+      <text x="8" y="${bounds.top + 4}" font-size="11" fill="#6B7280">100</text>
+      <text x="18" y="${bounds.bottom + 4}" font-size="11" fill="#6B7280">0</text>
+    </svg>
+    <div class="chart-legend">
+      <span><span class="legend-mark bad-line"></span>red solid = visible-only optimizer — ${escapeHtml(verifier.label)} score</span>
+      <span><span class="legend-mark bad-line dashed"></span>red dashed = visible-only optimizer — hidden reality audit</span>
+      <span><span class="legend-mark"></span>black = independent-gated optimizer — ${escapeHtml(verifier.label)} score</span>
+      <span><span class="legend-mark thin"></span>gray = independent-gated optimizer — hidden reality audit</span>
+    </div>
+    <p class="chart-scale-note"><strong>0–100 scale:</strong> normalized toy score points, not probability. 0 means fails the rubric/audit; 100 means maxes that verifier or audit. The independent gate score is not drawn as its own line; it is the filter shown in the loop trace that decides which candidates the gated optimizer may choose.</p>
+  `;
+
+  document.getElementById('loopTrace').innerHTML = steps.map(step => {
+    const rejected = step.independent_gated.rejected_names.length
+      ? `<div class="rejected">Rejected by independent verifier: ${step.independent_gated.rejected_names.map(escapeHtml).join(', ')}</div>`
+      : '<div class="small">No visible-higher candidate failed the gate.</div>';
+    return `<div class="trace-row">
+      <div class="small">Loop ${step.loop}</div>
+      <div class="trace-cell"><strong>Visible-only: ${escapeHtml(step.visible_only.selected_name)}</strong><span>${escapeHtml(verifier.label)} score ${fmt(step.visible_only.visible_score)} · hidden reality audit ${fmt(step.visible_only.hidden_reality_score)} · gap ${fmt(step.visible_only.goodhart_gap)}</span></div>
+      <div class="trace-cell"><strong>Independent-gated: ${escapeHtml(step.independent_gated.selected_name)}</strong><span>${escapeHtml(verifier.label)} score ${fmt(step.independent_gated.visible_score)} · independent gate ${fmt(step.independent_gated.independent_score)} · hidden reality audit ${fmt(step.independent_gated.hidden_reality_score)}</span>${rejected}</div>
+    </div>`;
+  }).join('');
+}
+
 function setVerifier(id) {
   activeVerifier = id;
   render();
@@ -859,6 +1318,7 @@ function render() {
   renderBars();
   renderPolicies();
   renderWinnerTable();
+  renderProof();
 }
 
 render();

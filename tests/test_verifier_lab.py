@@ -176,6 +176,55 @@ class VerifierLabTests(unittest.TestCase):
         self.assertIn("drift", kinds)
         self.assertIn("paraphrase", kinds)
 
+    def test_loop_proof_visible_only_goodharts_under_bad_proxy(self):
+        proof = self.data["loop_proof"]["bad_proxy"]
+        self.assertGreaterEqual(proof["loop_count"], 10)
+        visible_only = proof["summary"]["visible_only"]
+        gated = proof["summary"]["independent_gated"]
+        self.assertGreaterEqual(visible_only["final_goodhart_gap"], 45)
+        self.assertLessEqual(gated["final_goodhart_gap"], 10)
+        self.assertGreater(gated["final_hidden_reality_score"], visible_only["final_hidden_reality_score"] + 40)
+        self.assertGreaterEqual(gated["rejected_gaming_mutations"], 5)
+        self.assertFalse(proof["summary"]["hidden_score_used_for_selection"])
+
+    def test_loop_proof_keeps_independent_score_separate_from_hidden_reality(self):
+        proof = self.data["loop_proof"]["bad_proxy"]
+        first_step = proof["steps"][0]
+        self.assertIn("independent_score", first_step["candidates"][0])
+        self.assertIn("hidden_reality_score", first_step["candidates"][0])
+        self.assertTrue(
+            any(c["independent_score"] != c["hidden_reality_score"] for c in first_step["candidates"]),
+            "independent verifier score should not be the same object as hidden reality",
+        )
+
+    def test_loop_proof_same_candidates_are_seen_by_both_arms(self):
+        proof = self.data["loop_proof"]["overfit_visible"]
+        for step in proof["steps"]:
+            with self.subTest(loop=step["loop"]):
+                self.assertEqual(step["visible_only"]["seen_candidate_ids"], step["candidate_ids"])
+                self.assertEqual(step["independent_gated"]["seen_candidate_ids"], step["candidate_ids"])
+
+    def test_loop_proof_ui_is_rendered(self):
+        out = ROOT / "build-test"
+        paths = verifier_lab.write_outputs(out)
+        html = pathlib.Path(paths["index"]).read_text(encoding="utf-8")
+        self.assertIn("Verifier loop proof", html)
+        self.assertIn("Visible-only optimizer", html)
+        self.assertIn("Independent-verifier-gated optimizer", html)
+        self.assertIn("hidden reality lift", html)
+        self.assertIn("proofChart", html)
+        self.assertIn("loopTrace", html)
+        self.assertIn("Rejected by independent verifier", html)
+        self.assertIn("Independent gate score", html)
+        self.assertIn("hidden reality audit", html)
+        self.assertIn("independent gate ${fmt(step.independent_gated.independent_score)}", html)
+        self.assertIn("normalized score: 0–100", html)
+        self.assertIn("red: visible-only ${activeScoreLabel} score", html)
+        self.assertIn("red dashed = visible-only optimizer — hidden reality audit", html)
+        self.assertIn("black = independent-gated optimizer — ${escapeHtml(verifier.label)} score", html)
+        self.assertIn("The independent gate score is not drawn as its own line", html)
+        self.assertIn("0–100 scale:", html)
+
 
 if __name__ == "__main__":
     unittest.main()
