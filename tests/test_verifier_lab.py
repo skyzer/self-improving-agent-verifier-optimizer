@@ -204,6 +204,22 @@ class VerifierLabTests(unittest.TestCase):
                 self.assertEqual(step["visible_only"]["seen_candidate_ids"], step["candidate_ids"])
                 self.assertEqual(step["independent_gated"]["seen_candidate_ids"], step["candidate_ids"])
 
+    def test_lever_decisions_map_verifier_failures_to_actions(self):
+        decisions = self.data["lever_decisions"]
+        self.assertEqual(set(decisions), {"bad_proxy", "easy_surface", "overfit_visible", "robust_guardrail"})
+        for verifier_id in ["bad_proxy", "easy_surface", "overfit_visible"]:
+            with self.subTest(verifier=verifier_id):
+                decision = decisions[verifier_id]
+                self.assertEqual(decision["recommended_action"], "H_THEN_W")
+                self.assertGreater(decision["regret_if_w"], 30)
+                self.assertIn("oracle_sandwich", decision)
+                self.assertIn("shortcut_signal", decision)
+                self.assertIn("Do not train weights against a bad verifier", decision["reason"])
+        robust = decisions["robust_guardrail"]
+        self.assertEqual(robust["recommended_action"], "W")
+        self.assertLessEqual(robust["regret_if_w"], 5)
+        self.assertTrue(robust["oracle_sandwich"]["known_good_passes"])
+
     def test_loop_proof_ui_is_rendered(self):
         out = ROOT / "build-test"
         paths = verifier_lab.write_outputs(out)
@@ -224,6 +240,11 @@ class VerifierLabTests(unittest.TestCase):
         self.assertIn("black = independent-gated optimizer — ${escapeHtml(verifier.label)} score", html)
         self.assertIn("The independent gate score is not drawn as its own line", html)
         self.assertIn("0–100 scale:", html)
+        self.assertIn("leverSection", html)
+        self.assertIn("Which lever should the agent pull?", html)
+        self.assertIn("H→W", html)
+        self.assertIn("oracle sandwich", html)
+        self.assertIn("Do not train weights against a bad verifier", html)
 
 
 if __name__ == "__main__":

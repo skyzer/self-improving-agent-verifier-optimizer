@@ -11,7 +11,7 @@ An interactive demo showing how self-improving AI can learn to pass the wrong te
 ## Alternative short summaries
 
 1. An interactive demo showing why self-improving AI needs strong tests: weak checks can be passed without producing genuinely better answers.
-2. A hands-on lab where an AI optimizer learns to game bad scoring rules, then shows how better hidden checks catch the failure.
+2. A hands-on lab where an AI optimizer learns to game bad scoring rules, then shows why the safe response is to fix the verifier before training.
 3. A visual demo of the core SIA safety lesson: if you reward the wrong thing, a self-improving agent gets better at the wrong thing.
 4. An interactive verifier lab for SIA agents, showing how better evaluation keeps self-improvement aligned with real answer quality.
 5. A compact demo showing the difference between “looks good to the scoring rule” and “actually works on hidden checks.”
@@ -26,6 +26,8 @@ An interactive demo showing how self-improving AI can learn to pass the wrong te
 Verifier Design Lab is a static interactive demo for the Self Improving AI (SIA) Agents hackathon. It simulates a self-improving loop choosing candidate answers under four verifier designs: bad proxy, easy surface, overfit visible-set, and robust guardrail.
 
 The same candidate answer can receive different visible-to-optimizer verifier scores depending on the active lens, while a hidden reality score audits whether the answer actually generalizes. Weak verifiers produce high visible scores and large Goodhart gaps; the robust verifier reduces the gap by combining held-out checks, false-premise probes, freshness, citation quality, atomic support, usefulness, and overfit penalties.
+
+The latest version adds a lever-attribution layer: after the demo shows a verifier failure, it asks whether the SIA should fix the harness (`H`), train weights (`W`), or fix the verifier before training (`H→W`). Weak verifiers recommend `H→W` because training weights against a bad verifier preserves the shortcut; the Robust lens permits `W` while keeping hidden audits private.
 
 The demo also translates the lesson to Answer Engine Optimization: optimizing mention count, citation count, or target-answer mimicry can Goodhart unless balanced by source-backed, held-out evaluation.
 

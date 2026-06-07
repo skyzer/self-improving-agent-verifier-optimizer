@@ -484,6 +484,96 @@
       ]
     }
   },
+  "lever_decisions": {
+    "bad_proxy": {
+      "verifier_id": "bad_proxy",
+      "verifier_label": "Bad",
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "action_label": "Fix verifier, then train",
+      "diagnosis": "Proxy harness: it rewards length, keyword hits, and citation count more than supported truth.",
+      "reason": "Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score.",
+      "oracle_sandwich": {
+        "known_good_passes": false,
+        "verdict": "A known-good grounded answer is not the top answer, so the harness is not safe as the training target."
+      },
+      "shortcut_signal": "The chosen answer wins by stuffing keywords/citations while hidden reality stays low.",
+      "regret_if_w": 77.9,
+      "w_only_result": "W-only would chase the current Bad score and preserve a 91.9-point Goodhart gap.",
+      "h_then_w_result": "H\u2192W first adds held-out/source/anti-overfit checks, then trains only after hidden reality is above the weak winner's 8.1 audit score.",
+      "steps": [
+        "Run oracle sandwich: does a known-good answer pass the current verifier?",
+        "Probe shortcut signal: did the verifier reward a cheap visible trick?",
+        "If either check is unsafe, repair H before any W update."
+      ]
+    },
+    "easy_surface": {
+      "verifier_id": "easy_surface",
+      "verifier_label": "Easy",
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "action_label": "Fix verifier, then train",
+      "diagnosis": "Surface harness: it rewards one approved phrase even when the prompt needs nuance or refusal.",
+      "reason": "Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score.",
+      "oracle_sandwich": {
+        "known_good_passes": false,
+        "verdict": "A known-good answer can pass, but a shortcut passes too cheaply; the harness needs harder checks."
+      },
+      "shortcut_signal": "The chosen answer repeats the approved phrase and passes the visible check while hidden cases fail.",
+      "regret_if_w": 65.6,
+      "w_only_result": "W-only would chase the current Easy score and preserve a 79.6-point Goodhart gap.",
+      "h_then_w_result": "H\u2192W first adds held-out/source/anti-overfit checks, then trains only after hidden reality is above the weak winner's 17.2 audit score.",
+      "steps": [
+        "Run oracle sandwich: does a known-good answer pass the current verifier?",
+        "Probe shortcut signal: did the verifier reward a cheap visible trick?",
+        "If either check is unsafe, repair H before any W update."
+      ]
+    },
+    "overfit_visible": {
+      "verifier_id": "overfit_visible",
+      "verifier_label": "Overfit",
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "action_label": "Fix verifier, then train",
+      "diagnosis": "Visible-set harness: it rewards memorized training examples instead of paraphrase/generalization.",
+      "reason": "Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score.",
+      "oracle_sandwich": {
+        "known_good_passes": false,
+        "verdict": "A known-good answer is under-ranked because the harness overvalues memorized visible examples."
+      },
+      "shortcut_signal": "The chosen answer memorizes the visible set and collapses on hidden paraphrases.",
+      "regret_if_w": 77.4,
+      "w_only_result": "W-only would chase the current Overfit score and preserve a 91.4-point Goodhart gap.",
+      "h_then_w_result": "H\u2192W first adds held-out/source/anti-overfit checks, then trains only after hidden reality is above the weak winner's 0.0 audit score.",
+      "steps": [
+        "Run oracle sandwich: does a known-good answer pass the current verifier?",
+        "Probe shortcut signal: did the verifier reward a cheap visible trick?",
+        "If either check is unsafe, repair H before any W update."
+      ]
+    },
+    "robust_guardrail": {
+      "verifier_id": "robust_guardrail",
+      "verifier_label": "Robust",
+      "recommended_action": "W",
+      "display_action": "W",
+      "action_label": "Train weights under audit",
+      "diagnosis": "Usable harness: the visible score already tracks hidden reality in this toy setup.",
+      "reason": "The harness is good enough to train against, but hidden audits still stay held out because any exposed verifier can be gamed later.",
+      "oracle_sandwich": {
+        "known_good_passes": true,
+        "verdict": "A known-good grounded answer passes and wins, so a careful W update is allowed."
+      },
+      "shortcut_signal": "No shortcut winner: the robust grounded answer has a small score-vs-reality gap.",
+      "regret_if_w": 1.6,
+      "w_only_result": "W can improve capability because the Robust score is aligned with the hidden audit in this toy case.",
+      "h_then_w_result": "Still keep an independent held-out audit and refresh adversarial checks; Robust is not magic or final.",
+      "steps": [
+        "Run oracle sandwich: known-good answer passes.",
+        "Probe shortcut signal: no cheap visible shortcut is winning.",
+        "Allow W, while keeping hidden audits private and refreshed."
+      ]
+    }
+  },
   "loop_proof": {
     "bad_proxy": {
       "verifier_id": "bad_proxy",

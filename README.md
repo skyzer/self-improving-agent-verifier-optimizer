@@ -21,8 +21,9 @@ Verifier Design Lab makes that failure mode concrete:
 - Switch the active verifier lens: **Bad**, **Easy**, **Overfit**, or **Robust**.
 - Watch the optimizer select the answer with the highest visible-to-optimizer verifier score.
 - Compare that selected answer against the private **hidden reality score**.
+- Use the new **lever attribution** layer to decide whether the SIA should fix the harness (`H`), train weights (`W`), or fix the verifier before training (`H→W`).
 
-The key lesson is the Goodhart warning from SIA: harness updates and weight updates are powerful, but both optimize the scoring function you give them.
+The key lesson is the Goodhart warning from SIA: harness updates and weight updates are powerful, but both optimize the scoring function you give them. If the scoring function is bad, the safe intervention is usually **H first**, not blind weight training.
 
 ## Official SIA resources
 
@@ -57,6 +58,18 @@ The interactive bench includes five demo prompts:
 - **Hidden reality score** — a private held-out audit score that the optimizer does not see.
 - **Optimizer** — the selector/chaser that picks the answer with the highest visible verifier score.
 - **Goodhart gap** — verifier score minus hidden reality score. A large positive gap means the answer looks good to the verifier but fails the hidden audit.
+
+## Lever attribution layer
+
+Inspired by the SIA-Lever framing, the demo now turns score gaming into an operational decision:
+
+- **H** — fix the harness/verifier/scaffold. Use this when the evaluator itself is broken or rejects known-good behavior.
+- **W** — train model weights against the current verifier. Use this only when the harness is trustworthy enough.
+- **H→W** — fix the verifier first, then train against the repaired score. Use this when a weak verifier passed a shortcut.
+
+For **Bad**, **Easy**, and **Overfit** lenses, the demo recommends `H→W`: do not train weights against a bad verifier. For **Robust**, it allows `W` while warning that hidden audits must remain held out because any exposed verifier can eventually be gamed.
+
+The section also introduces an **oracle sandwich** check: if a known-good answer fails or is under-ranked by the current verifier, the harness needs repair before weight training.
 
 ## Answer Engine Optimization implication
 
@@ -128,9 +141,10 @@ python3 -m unittest discover -s tests -v
 3. Watch the middle column update: it always shows all candidate answers for the selected scenario, with the optimizer's chosen answer highlighted.
 4. Use the verifier lens in the top right: **Bad**, **Easy**, **Overfit**, then **Robust**.
 5. Show that weak lenses choose brittle policies with high verifier scores and low hidden reality scores.
-6. Switch to **Robust** and show the grounded policy wins and the Goodhart gap nearly disappears.
-7. Connect back to SIA: harness updates and weight updates are powerful, but both optimize the verifier.
-8. Connect to Answer Engine Optimization: bad metrics like mention count, citation count, or target-answer mimicry can Goodhart unless balanced by held-out prompts and atomic support checks.
+6. Scroll to **Which lever should the agent pull?** and explain: weak verifier → `H→W`; robust verifier → `W` is allowed but still audited.
+7. Switch to **Robust** and show the grounded policy wins and the Goodhart gap nearly disappears.
+8. Connect back to SIA: harness updates and weight updates are powerful, but both optimize the verifier.
+9. Connect to Answer Engine Optimization: bad metrics like mention count, citation count, or target-answer mimicry can Goodhart unless balanced by held-out prompts and atomic support checks.
 
 ## Visual design
 
@@ -140,12 +154,13 @@ The browser demo uses the **Handhold Minimal** design system: black text on whit
 
 - `verifier_lab.py` — deterministic scoring engine + HTML/data generator.
 - `index.html` — interactive browser demo served by GitHub Pages.
-- `data/results.json` — generated score matrix.
-- `tests/test_verifier_lab.py` — regression tests proving expected Goodhart behavior and UI wording.
+- `data/results.json` — generated score matrix, loop proof, and lever-attribution decisions.
+- `tests/test_verifier_lab.py` — regression tests proving expected Goodhart behavior, lever decisions, and UI wording.
 - `ux-structure-options.html` — alternate UX structure ideas.
 - `ux-fit-options.html` — compact layout alternatives.
 - `Dockerfile` / `docker-compose.yml` — local containerized serving.
 - `SUBMISSION.md` — Oatmeal submission copy.
+- `LEARNING.md` — explanation of the SIA-Lever ideas borrowed conceptually and how to teach them.
 - `media/01-overfit-goodhart-gap.png` — screenshot showing a high score but failed hidden reality check.
 - `media/02-robust-small-gap.png` — screenshot showing the robust verifier with a small gap.
 - `media/03-aeo-false-promise-robust.png` — screenshot showing a hidden false-premise scenario.

@@ -683,6 +683,85 @@ def build_loop_proofs(loop_count: int = PROOF_LOOP_COUNT) -> Dict[str, object]:
     return {verifier.id: run_loop_proof(verifier.id, loop_count) for verifier in VERIFIERS}
 
 
+def build_lever_decisions(winners: Dict[str, object]) -> Dict[str, object]:
+    """Translate verifier failures into the SIA H/W/H→W intervention choice.
+
+    This borrows the SIA-Lever *idea* (lever attribution), not its code: a bad
+    harness should be fixed before any weight update is trained against it.
+    """
+    labels = {verifier.id: verifier.label for verifier in VERIFIERS}
+    weak_copy = {
+        "bad_proxy": {
+            "diagnosis": "Proxy harness: it rewards length, keyword hits, and citation count more than supported truth.",
+            "shortcut_signal": "The chosen answer wins by stuffing keywords/citations while hidden reality stays low.",
+            "oracle": "A known-good grounded answer is not the top answer, so the harness is not safe as the training target.",
+        },
+        "easy_surface": {
+            "diagnosis": "Surface harness: it rewards one approved phrase even when the prompt needs nuance or refusal.",
+            "shortcut_signal": "The chosen answer repeats the approved phrase and passes the visible check while hidden cases fail.",
+            "oracle": "A known-good answer can pass, but a shortcut passes too cheaply; the harness needs harder checks.",
+        },
+        "overfit_visible": {
+            "diagnosis": "Visible-set harness: it rewards memorized training examples instead of paraphrase/generalization.",
+            "shortcut_signal": "The chosen answer memorizes the visible set and collapses on hidden paraphrases.",
+            "oracle": "A known-good answer is under-ranked because the harness overvalues memorized visible examples.",
+        },
+    }
+    decisions: Dict[str, object] = {}
+    for verifier_id, copy in weak_copy.items():
+        winner = winners[verifier_id]
+        gap = float(winner["goodhart_gap"])
+        hidden = float(winner["hidden_reality_score"])
+        decisions[verifier_id] = {
+            "verifier_id": verifier_id,
+            "verifier_label": labels[verifier_id],
+            "recommended_action": "H_THEN_W",
+            "display_action": "H→W",
+            "action_label": "Fix verifier, then train",
+            "diagnosis": copy["diagnosis"],
+            "reason": "Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score.",
+            "oracle_sandwich": {
+                "known_good_passes": False,
+                "verdict": copy["oracle"],
+            },
+            "shortcut_signal": copy["shortcut_signal"],
+            "regret_if_w": round(max(35.0, gap - 14.0), 1),
+            "w_only_result": f"W-only would chase the current {labels[verifier_id]} score and preserve a {gap:.1f}-point Goodhart gap.",
+            "h_then_w_result": f"H→W first adds held-out/source/anti-overfit checks, then trains only after hidden reality is above the weak winner's {hidden:.1f} audit score.",
+            "steps": [
+                "Run oracle sandwich: does a known-good answer pass the current verifier?",
+                "Probe shortcut signal: did the verifier reward a cheap visible trick?",
+                "If either check is unsafe, repair H before any W update.",
+            ],
+        }
+
+    robust = winners["robust_guardrail"]
+    robust_gap = abs(float(robust["goodhart_gap"]))
+    decisions["robust_guardrail"] = {
+        "verifier_id": "robust_guardrail",
+        "verifier_label": labels["robust_guardrail"],
+        "recommended_action": "W",
+        "display_action": "W",
+        "action_label": "Train weights under audit",
+        "diagnosis": "Usable harness: the visible score already tracks hidden reality in this toy setup.",
+        "reason": "The harness is good enough to train against, but hidden audits still stay held out because any exposed verifier can be gamed later.",
+        "oracle_sandwich": {
+            "known_good_passes": True,
+            "verdict": "A known-good grounded answer passes and wins, so a careful W update is allowed.",
+        },
+        "shortcut_signal": "No shortcut winner: the robust grounded answer has a small score-vs-reality gap.",
+        "regret_if_w": round(min(5.0, robust_gap + 0.8), 1),
+        "w_only_result": f"W can improve capability because the {labels['robust_guardrail']} score is aligned with the hidden audit in this toy case.",
+        "h_then_w_result": "Still keep an independent held-out audit and refresh adversarial checks; Robust is not magic or final.",
+        "steps": [
+            "Run oracle sandwich: known-good answer passes.",
+            "Probe shortcut signal: no cheap visible shortcut is winning.",
+            "Allow W, while keeping hidden audits private and refreshed.",
+        ],
+    }
+    return decisions
+
+
 def evaluate() -> Dict[str, object]:
     policies = []
     for policy in POLICIES:
@@ -725,6 +804,7 @@ def evaluate() -> Dict[str, object]:
         "verifiers": [asdict(v) for v in VERIFIERS],
         "policies": policies,
         "winners": winners,
+        "lever_decisions": build_lever_decisions(winners),
         "loop_proof": build_loop_proofs(),
         "takeaway": "A self-improving loop is only as trustworthy as the verifier and held-out reality checks it cannot see.",
     }
@@ -880,12 +960,31 @@ HTML_TEMPLATE = r'''<!doctype html>
     .trace-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-sm); border-top: 1px solid var(--color-neutral); padding-top: 6px; font-size: 12px; line-height: 16px; }
     .trace-cell strong { display: block; font-size: 13px; line-height: 18px; }
     .rejected { color: var(--color-error); margin-top: 3px; }
+    .lever-section { margin-top: var(--space-lg); }
+    .lever-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-md); align-items: end; margin-bottom: var(--space-md); }
+    .lever-key { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-sm); margin-bottom: var(--space-md); }
+    .lever-key-item { border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); font-size: 13px; line-height: 18px; color: var(--color-secondary); }
+    .lever-key-item strong { display: block; color: var(--color-on-surface); font-size: 16px; line-height: 22px; }
+    .lever-grid { display: grid; grid-template-columns: 1.1fr .9fr; gap: var(--space-md); align-items: start; }
+    .lever-decision { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .lever-decision h3 { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); }
+    .lever-action { font-size: 28px; line-height: 34px; font-weight: 800; letter-spacing: -0.04em; }
+    .lever-action.bad { color: var(--color-error); }
+    .lever-action.good { color: var(--color-primary); }
+    .lever-tests { display: grid; gap: 7px; margin-top: var(--space-md); }
+    .lever-test { border-top: 1px solid var(--color-neutral); padding-top: 7px; color: var(--color-secondary); font-size: 13px; line-height: 18px; }
+    .lever-test strong { color: var(--color-on-surface); }
+    .lever-cards { display: grid; gap: 6px; }
+    .lever-card { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); background: var(--color-surface); text-align: left; width: 100%; color: var(--color-secondary); }
+    .lever-card.active { border-color: var(--color-primary); color: var(--color-on-surface); }
+    .lever-card strong { display: flex; justify-content: space-between; gap: var(--space-sm); color: var(--color-on-surface); }
+    .lever-card small { display: block; margin-top: 2px; color: var(--color-tertiary); line-height: 16px; }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-top: var(--space-lg); }
     ul { margin: var(--space-sm) 0 0; padding-left: var(--space-xl); color: var(--color-secondary); line-height: 24px; }
     li { margin-bottom: var(--space-xs); }
     .footer { margin-top: var(--space-xl); color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
-    @media (max-width: 980px) { .hero, .grid, .two, .lab-topbar, .lab-grid { grid-template-columns: 1fr; } .explainer-grid { grid-template-columns: 1fr 1fr; } .lab-frame { height: auto; min-height: 0; } .scenario-nav { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-md); } .scenario-list { overflow: visible; } .answer-grid { overflow: visible; } .result-panel { min-height: 0; } .lens-wrap { justify-items: start; } .lens-row { justify-content: flex-start; } .bar-row { grid-template-columns: 110px 1fr 52px 52px; } }
-    @media (max-width: 560px) { .wrap { width: min(100% - 24px, 1220px); padding: 14px 0 40px; } .explainer-grid { grid-template-columns: 1fr; } .score-big, .metric-row { grid-template-columns: 1fr; } .bar-row { grid-template-columns: 1fr 48px 48px; } .bar-track { grid-column: 1 / -1; } }
+    @media (max-width: 980px) { .hero, .grid, .two, .lab-topbar, .lab-grid, .lever-grid { grid-template-columns: 1fr; } .explainer-grid, .lever-key { grid-template-columns: 1fr 1fr; } .lab-frame { height: auto; min-height: 0; } .scenario-nav { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-md); } .scenario-list { overflow: visible; } .answer-grid { overflow: visible; } .result-panel { min-height: 0; } .lens-wrap { justify-items: start; } .lens-row { justify-content: flex-start; } .bar-row { grid-template-columns: 110px 1fr 52px 52px; } }
+    @media (max-width: 560px) { .wrap { width: min(100% - 24px, 1220px); padding: 14px 0 40px; } .explainer-grid, .lever-key { grid-template-columns: 1fr; } .score-big, .metric-row { grid-template-columns: 1fr; } .bar-row { grid-template-columns: 1fr 48px 48px; } .bar-track { grid-column: 1 / -1; } }
     @media (prefers-reduced-motion: reduce) { button, .bar { transition: none; } }
   </style>
 </head>
@@ -969,6 +1068,22 @@ HTML_TEMPLATE = r'''<!doctype html>
       </div>
     </section>
 
+    <section class="card section lever-section" id="leverSection" aria-labelledby="leverTitle">
+      <div class="lever-head">
+        <div>
+          <h2 id="leverTitle">Which lever should the agent pull?</h2>
+          <p class="small">Borrowing the SIA-Lever lesson: after a failure, the meta-agent should choose whether to fix the harness/verifier, train weights, or do both. The dangerous move is to train weights against a bad verifier.</p>
+        </div>
+        <div class="quiet-label">Updates with the active verifier lens</div>
+      </div>
+      <div class="lever-key" aria-label="SIA lever glossary">
+        <div class="lever-key-item"><strong>H</strong>Fix harness/verifier/scaffold. No model-weight training yet.</div>
+        <div class="lever-key-item"><strong>W</strong>Train model weights against the current verifier.</div>
+        <div class="lever-key-item"><strong>H→W</strong>Fix verifier first, then train against the repaired score.</div>
+      </div>
+      <div id="leverPanel"></div>
+    </section>
+
     <section class="grid">
       <div class="card section winner" id="winner"></div>
       <div class="card section">
@@ -1034,6 +1149,7 @@ function exampleById(id) { return LAB_RESULTS.demo_examples.find(e => e.id === i
 function responseFor(exampleId, policyId) { return LAB_RESULTS.example_responses[exampleId][policyId]; }
 function winnerFor(id) { return LAB_RESULTS.winners[id]; }
 function activeProof() { return LAB_RESULTS.loop_proof[activeVerifier]; }
+function decisionFor(id) { return LAB_RESULTS.lever_decisions[id]; }
 
 function fmt(n) { return Number(n).toFixed(1); }
 function gapClass(gap) { return gap > 20 ? 'gap-positive' : 'gap-low'; }
@@ -1300,6 +1416,47 @@ function renderProof() {
   }).join('');
 }
 
+function renderLeverSection() {
+  const decision = decisionFor(activeVerifier);
+  const verifier = verifierById(activeVerifier);
+  const actionClass = decision.recommended_action === 'W' ? 'good' : 'bad';
+  const oracleText = decision.oracle_sandwich.known_good_passes
+    ? 'Known-good answer passes this harness check.'
+    : 'Known-good answer is under-ranked by this harness check.';
+  const cards = LAB_RESULTS.verifiers.map(v => {
+    const d = decisionFor(v.id);
+    return `<button class="lever-card ${v.id === activeVerifier ? 'active' : ''}" aria-pressed="${v.id === activeVerifier}" onclick="setVerifier('${v.id}')">
+      <strong><span>${escapeHtml(v.label)} score</span><span>${escapeHtml(d.display_action)}</span></strong>
+      <small>${escapeHtml(d.action_label)}</small>
+      <small>W regret if chosen blindly: ${fmt(d.regret_if_w)}</small>
+    </button>`;
+  }).join('');
+  document.getElementById('leverPanel').innerHTML = `
+    <div class="lever-grid">
+      <div class="lever-decision">
+        <h3><span>${escapeHtml(verifier.label)} lens decision</span><span class="lever-action ${actionClass}">${escapeHtml(decision.display_action)}</span></h3>
+        <p>${escapeHtml(decision.reason)}</p>
+        <div class="metric-row">
+          <div class="metric"><label>Recommended action</label><b>${escapeHtml(decision.action_label)}</b></div>
+          <div class="metric"><label>Blind W regret</label><b>${fmt(decision.regret_if_w)}</b></div>
+          <div class="metric"><label>Harness check</label><b>${decision.oracle_sandwich.known_good_passes ? 'passes' : 'unsafe'}</b></div>
+        </div>
+        <div class="lever-tests">
+          <div class="lever-test"><strong>oracle sandwich:</strong> ${escapeHtml(oracleText)} ${escapeHtml(decision.oracle_sandwich.verdict)}</div>
+          <div class="lever-test"><strong>Shortcut signal:</strong> ${escapeHtml(decision.shortcut_signal)}</div>
+          <div class="lever-test"><strong>W-only:</strong> ${escapeHtml(decision.w_only_result)}</div>
+          <div class="lever-test"><strong>H→W:</strong> ${escapeHtml(decision.h_then_w_result)}</div>
+        </div>
+      </div>
+      <div>
+        <div class="quiet-label">Lever attribution by verifier lens</div>
+        <div class="lever-cards">${cards}</div>
+        <p class="small">This is a teaching layer inspired by SIA-Lever's attribution question: choose the minimal safe intervention instead of reflexively training weights.</p>
+      </div>
+    </div>
+  `;
+}
+
 function setVerifier(id) {
   activeVerifier = id;
   render();
@@ -1319,6 +1476,7 @@ function render() {
   renderPolicies();
   renderWinnerTable();
   renderProof();
+  renderLeverSection();
 }
 
 render();
