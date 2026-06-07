@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en" data-design-system="Handhold Minimal">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verifier Design Lab: UX Structure Options</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+  <link rel="icon" href="./favicon-32x32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #000000;
+      --color-secondary: #374151;
+      --color-tertiary: #6B7280;
+      --color-neutral: #E5E7EB;
+      --color-surface: #FFFFFF;
+      --color-on-surface: #000000;
+      --color-error: #B91C1C;
+      --color-background: #FFFFFF;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 20px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--color-background);
+      color: var(--color-on-surface);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    .wrap { width: min(1180px, calc(100vw - 32px)); margin: 0 auto; padding: 48px 0 72px; }
+    header { max-width: 760px; margin-bottom: 28px; }
+    .kicker { color: var(--color-tertiary); font-size: 12px; line-height: 16px; margin-bottom: var(--space-sm); }
+    h1 { font-size: 32px; line-height: 38px; font-weight: 700; margin: 0 0 var(--space-md); }
+    h2 { font-size: 23px; line-height: 28px; font-weight: 400; margin: 0 0 var(--space-md); }
+    h3 { font-size: 19px; line-height: 23px; font-weight: 400; margin: 0 0 var(--space-sm); }
+    p { margin: 0 0 var(--space-md); color: var(--color-secondary); line-height: 24px; }
+    a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; }
+    .meta { display: flex; flex-wrap: wrap; gap: var(--space-sm); color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    .meta span + span::before { content: "/"; color: var(--color-neutral); margin-right: var(--space-sm); }
+    .summary { border: 1px solid var(--color-primary); border-radius: var(--radius-md); padding: var(--space-lg); margin-bottom: var(--space-lg); }
+    .summary strong { color: var(--color-primary); }
+    .option-list { display: grid; gap: 28px; }
+    .option { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); background: var(--color-surface); }
+    .option-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-lg); padding: var(--space-lg); border-bottom: 1px solid var(--color-neutral); align-items: start; }
+    .option-number { color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    .score { font-size: 12px; line-height: 16px; color: var(--color-tertiary); text-align: right; }
+    .score b { display: block; color: var(--color-primary); font-size: 19px; line-height: 23px; font-weight: 400; }
+    .reason { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); padding: 0 var(--space-lg) var(--space-lg); }
+    .reason div { border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); color: var(--color-secondary); font-size: 14px; line-height: 20px; }
+    .reason strong { display: block; color: var(--color-primary); font-weight: 400; margin-bottom: 2px; }
+    .mock { padding: var(--space-lg); border-top: 1px solid var(--color-neutral); }
+    .canvas { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); min-height: 360px; padding: var(--space-lg); background: var(--color-surface); }
+    .quiet { color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    .small { color: var(--color-tertiary); font-size: 14px; line-height: 20px; }
+    .button, button, select {
+      min-height: 40px;
+      border: 1px solid var(--color-neutral);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-primary);
+      font: 400 16px/24px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 8px 12px;
+    }
+    button { cursor: pointer; }
+    button:hover, .button:hover, select:hover { border-color: var(--color-primary); }
+    button:focus-visible, select:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+    .active, button.active { background: var(--color-primary); color: var(--color-surface); border-color: var(--color-primary); }
+    .danger { color: var(--color-error); }
+    .good { color: var(--color-primary); }
+    .muted-card { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .divider { border-top: 1px solid var(--color-neutral); margin: var(--space-lg) 0; }
+
+    /* Option A */
+    .a-layout { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: var(--space-lg); }
+    .scenario-list { display: grid; gap: var(--space-sm); }
+    .scenario-card { text-align: left; padding: var(--space-md); min-height: 64px; }
+    .scenario-card small { display: block; margin-top: 2px; color: inherit; opacity: .75; font-size: 12px; line-height: 16px; }
+    .lens-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: var(--space-md) 0 var(--space-lg); }
+    .result-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); }
+    .metric { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .metric label { display: block; color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    .metric b { display: block; font-size: 23px; line-height: 28px; font-weight: 400; }
+
+    /* Option B */
+    .matrix { width: 100%; border-collapse: collapse; font-size: 14px; line-height: 20px; }
+    .matrix th, .matrix td { border: 1px solid var(--color-neutral); padding: var(--space-sm); vertical-align: top; text-align: left; }
+    .matrix th { color: var(--color-secondary); font-weight: 400; background: var(--color-surface); }
+    .matrix td.selected { outline: 2px solid var(--color-primary); outline-offset: -2px; }
+    .matrix .cell-title { display: block; color: var(--color-primary); margin-bottom: 2px; }
+    .matrix .cell-note { color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+
+    /* Option C */
+    .guided { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: var(--space-lg); }
+    .rail { border-right: 1px solid var(--color-neutral); padding-right: var(--space-lg); display: grid; gap: var(--space-md); align-content: start; }
+    .rail-step { display: grid; grid-template-columns: 28px 1fr; gap: var(--space-sm); color: var(--color-secondary); }
+    .rail-step b { width: 28px; height: 28px; border-radius: var(--radius-sm); border: 1px solid var(--color-primary); display: grid; place-items: center; font-weight: 400; }
+    .rail-step.done b { background: var(--color-primary); color: var(--color-surface); }
+    .choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); margin-bottom: var(--space-lg); }
+    .choice { padding: var(--space-md); border: 1px solid var(--color-neutral); border-radius: var(--radius-md); }
+    .choice.selected { border-color: var(--color-primary); }
+
+    /* Option D */
+    .compare-top { display: grid; grid-template-columns: minmax(0, 1fr) 260px; gap: var(--space-lg); align-items: end; margin-bottom: var(--space-lg); }
+    .columns { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); }
+    .column { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); min-height: 240px; }
+    .column.risky { border-color: var(--color-error); }
+    .column h4 { margin: 0 0 var(--space-sm); font-size: 16px; line-height: 24px; font-weight: 400; }
+    .column .value { font-size: 27px; line-height: 28px; font-weight: 400; margin-bottom: var(--space-sm); }
+
+    @media (max-width: 980px) {
+      .option-head, .a-layout, .guided, .compare-top { grid-template-columns: 1fr; }
+      .reason, .result-grid, .columns { grid-template-columns: 1fr 1fr; }
+      .rail { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-lg); }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 24px, 1180px); padding: 28px 0 48px; }
+      .reason, .result-grid, .columns, .choice-grid { grid-template-columns: 1fr; }
+      .matrix { min-width: 760px; }
+      .matrix-wrap { overflow-x: auto; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="kicker">UX structure options</div>
+      <h1>Verifier Design Lab navigation alternatives</h1>
+      <p>The current page asks people to make two separate choices: one verifier and one prompt. That creates eight-plus controls before the user understands the story. These options restructure the same content so the choice model is clearer.</p>
+      <p class="meta"><span>Handhold Minimal</span><span>static HTML ideas</span><span>choose one direction to implement</span></p>
+    </header>
+
+    <section class="summary">
+      <h2>My recommendation</h2>
+      <p><strong>Use Option D for the public demo:</strong> make the prompt/scenario the primary choice, then show all four verifiers side by side. It removes the first row of four verifier buttons entirely and makes the Goodhart comparison immediate.</p>
+      <p>If the demo must feel more guided, choose <strong>Option C</strong>. If you want the most compact product UI, choose <strong>Option A</strong>.</p>
+    </section>
+
+    <div class="option-list">
+      <article class="option" id="option-a">
+        <div class="option-head">
+          <div>
+            <div class="option-number">Option A</div>
+            <h2>Scenario-first, verifier as a lens</h2>
+            <p>Primary navigation becomes the test scenario. Verifier selection becomes a smaller lens switch inside the result panel. This keeps the user focused on the question being tested.</p>
+          </div>
+          <div class="score"><b>Compact</b>best for product feel</div>
+        </div>
+        <div class="reason">
+          <div><strong>Solves</strong>Two stacked button groups competing for attention.</div>
+          <div><strong>Tradeoff</strong>Still has verifier controls, but secondary.</div>
+          <div><strong>Use when</strong>You want one-at-a-time exploration.</div>
+        </div>
+        <div class="mock">
+          <div class="canvas a-layout">
+            <aside>
+              <div class="quiet">Choose scenario</div>
+              <div class="scenario-list">
+                <button class="scenario-card active">SIA two levers<small>concept · visible</small></button>
+                <button class="scenario-card">Answer Engine Optimization false promise<small>false premise · hidden</small></button>
+                <button class="scenario-card">Citation-count trap<small>citation support · hidden</small></button>
+                <button class="scenario-card">Freshness drift<small>drift · hidden</small></button>
+                <button class="scenario-card">Goodhart paraphrase<small>paraphrase · hidden</small></button>
+              </div>
+            </aside>
+            <section>
+              <div class="quiet">Verifier lens</div>
+              <div class="lens-row" role="group" aria-label="Verifier lens">
+                <button class="active">Bad</button>
+                <button>Easy</button>
+                <button>Overfit</button>
+                <button>Robust</button>
+              </div>
+              <h3>SIA two levers</h3>
+              <p>The selected verifier chooses the policy the optimizer would trust for this scenario.</p>
+              <div class="result-grid">
+                <div class="metric"><label>Winner</label><b>Bad</b></div>
+                <div class="metric"><label>Visible score</label><b>100.0</b></div>
+                <div class="metric"><label>Hidden reality</label><b class="danger">8.1</b></div>
+              </div>
+              <div class="divider"></div>
+              <p class="small">Why it works: the scenario list is the user's natural story path; verifier choice becomes an analytical filter.</p>
+            </section>
+          </div>
+        </div>
+      </article>
+
+      <article class="option" id="option-b">
+        <div class="option-head">
+          <div>
+            <div class="option-number">Option B</div>
+            <h2>Matrix picker</h2>
+            <p>Turn the two dimensions into one grid: rows are scenarios, columns are verifiers. The user sees the structure immediately and can jump to any combination.</p>
+          </div>
+          <div class="score"><b>Structured</b>best for analysts</div>
+        </div>
+        <div class="reason">
+          <div><strong>Solves</strong>Makes the 4 × 5 relationship explicit.</div>
+          <div><strong>Tradeoff</strong>More dense; less narrative.</div>
+          <div><strong>Use when</strong>The audience is technical and wants the whole eval shape.</div>
+        </div>
+        <div class="mock">
+          <div class="canvas matrix-wrap">
+            <table class="matrix">
+              <thead>
+                <tr>
+                  <th>Scenario</th>
+                  <th>Bad</th>
+                  <th>Easy</th>
+                  <th>Overfit</th>
+                  <th>Robust</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th>SIA two levers</th>
+                  <td class="selected"><span class="cell-title">Bad</span><span class="cell-note danger">gap 91.9</span></td>
+                  <td><span class="cell-title">Easy</span><span class="cell-note danger">gap 79.6</span></td>
+                  <td><span class="cell-title">Overfit</span><span class="cell-note danger">gap 91.4</span></td>
+                  <td><span class="cell-title">Robust</span><span class="cell-note">gap 0.8</span></td>
+                </tr>
+                <tr>
+                  <th>Answer Engine Optimization false promise</th>
+                  <td><span class="cell-title">Overclaims</span><span class="cell-note danger">false promise</span></td>
+                  <td><span class="cell-title">Parrots</span><span class="cell-note danger">misses refusal</span></td>
+                  <td><span class="cell-title">No answer</span><span class="cell-note danger">unseen case</span></td>
+                  <td><span class="cell-title">Refuses premise</span><span class="cell-note">grounded</span></td>
+                </tr>
+                <tr>
+                  <th>Citation-count trap</th>
+                  <td><span class="cell-title">Passes spam</span><span class="cell-note danger">count only</span></td>
+                  <td><span class="cell-title">Passes shallow</span><span class="cell-note danger">citation exists</span></td>
+                  <td><span class="cell-title">Not covered</span><span class="cell-note danger">memorized</span></td>
+                  <td><span class="cell-title">Checks support</span><span class="cell-note">relevance</span></td>
+                </tr>
+                <tr>
+                  <th>Freshness drift</th>
+                  <td><span class="cell-title">Keyword pass</span><span class="cell-note danger">stale</span></td>
+                  <td><span class="cell-title">Phrase pass</span><span class="cell-note danger">stale</span></td>
+                  <td><span class="cell-title">Out of set</span><span class="cell-note danger">brittle</span></td>
+                  <td><span class="cell-title">Recrawl + rerun</span><span class="cell-note">fresh</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </article>
+
+      <article class="option" id="option-c">
+        <div class="option-head">
+          <div>
+            <div class="option-number">Option C</div>
+            <h2>Guided three-step story</h2>
+            <p>For a hackathon talk track, replace freeform controls with a sequence: pick a case, inspect weak verifiers, then reveal robust behavior. This makes the demo feel like a lesson.</p>
+          </div>
+          <div class="score"><b>Guided</b>best for presenting</div>
+        </div>
+        <div class="reason">
+          <div><strong>Solves</strong>Audience does not need to learn all controls upfront.</div>
+          <div><strong>Tradeoff</strong>Less exploratory; more scripted.</div>
+          <div><strong>Use when</strong>You want judges to reach the point fast.</div>
+        </div>
+        <div class="mock">
+          <div class="canvas guided">
+            <aside class="rail">
+              <div class="rail-step done"><b>1</b><span>Choose a failure case</span></div>
+              <div class="rail-step done"><b>2</b><span>Show weak verifier behavior</span></div>
+              <div class="rail-step"><b>3</b><span>Compare robust guardrail</span></div>
+            </aside>
+            <section>
+              <h3>Step 1: pick the case</h3>
+              <div class="choice-grid">
+                <div class="choice selected"><strong>False promise</strong><p class="small">Can Answer Engine Optimization rewrite private model weights?</p></div>
+                <div class="choice"><strong>Citation-count trap</strong><p class="small">Many citations, weak support.</p></div>
+                <div class="choice"><strong>Freshness drift</strong><p class="small">The product changed after launch.</p></div>
+                <div class="choice"><strong>Goodhart paraphrase</strong><p class="small">Same idea, different wording.</p></div>
+              </div>
+              <h3>Step 2: weak verifiers fail</h3>
+              <p>Bad rewards mention/citation stuffing. Easy rewards approved phrasing. Overfit rewards memorized examples.</p>
+              <h3>Step 3: robust verifier succeeds</h3>
+              <p>The robust verifier checks false premises, source support, freshness, and usefulness before rewarding the answer.</p>
+            </section>
+          </div>
+        </div>
+      </article>
+
+      <article class="option" id="option-d">
+        <div class="option-head">
+          <div>
+            <div class="option-number">Option D</div>
+            <h2>Compare all verifiers for one prompt</h2>
+            <p>Remove the verifier selector completely. The user picks one scenario, and the page shows Bad, Easy, Overfit, and Robust side by side. This is the clearest way to teach Goodhart.</p>
+          </div>
+          <div class="score"><b>Recommended</b>best for the demo</div>
+        </div>
+        <div class="reason">
+          <div><strong>Solves</strong>No row of four verifier buttons.</div>
+          <div><strong>Tradeoff</strong>More horizontal content per scenario.</div>
+          <div><strong>Use when</strong>You want the Goodhart gap to be obvious instantly.</div>
+        </div>
+        <div class="mock">
+          <div class="canvas">
+            <div class="compare-top">
+              <div>
+                <div class="quiet">Scenario</div>
+                <h3>Answer Engine Optimization false promise</h3>
+                <p>Can our product directly rewrite ChatGPT's private weights so clients are mentioned more often?</p>
+              </div>
+              <select aria-label="Scenario">
+                <option>Answer Engine Optimization false promise</option>
+                <option>SIA two levers</option>
+                <option>Citation-count trap</option>
+                <option>Freshness drift</option>
+                <option>Goodhart paraphrase</option>
+              </select>
+            </div>
+            <div class="columns">
+              <div class="column risky">
+                <h4>Bad verifier</h4>
+                <div class="value danger">91.9</div>
+                <p class="small">Rewards confident visibility claims and citation count.</p>
+                <p class="danger">Fails: false premise.</p>
+              </div>
+              <div class="column risky">
+                <h4>Easy verifier</h4>
+                <div class="value danger">79.6</div>
+                <p class="small">Rewards the approved phrase even when refusal is needed.</p>
+                <p class="danger">Fails: nuance.</p>
+              </div>
+              <div class="column risky">
+                <h4>Overfit verifier</h4>
+                <div class="value danger">91.4</div>
+                <p class="small">Only knows the visible training cases.</p>
+                <p class="danger">Fails: hidden case.</p>
+              </div>
+              <div class="column">
+                <h4>Robust guardrail</h4>
+                <div class="value">0.8</div>
+                <p class="small">Rejects the premise and checks grounded source-backed representation.</p>
+                <p>Passes: truthful refusal.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </main>
+  <script>
+    document.querySelectorAll('button').forEach(button => {
+      button.addEventListener('click', () => {
+        const group = button.closest('.scenario-list, .lens-row');
+        if (!group) return;
+        group.querySelectorAll('button').forEach(item => item.classList.remove('active'));
+        button.classList.add('active');
+      });
+    });
+  </script>
+</body>
+</html>

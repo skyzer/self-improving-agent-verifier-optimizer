@@ -1,0 +1,10 @@
+services:
+  verifier-design-lab:
+    build: .
+    image: verifier-design-lab:latest
+    container_name: verifier-design-lab
+    ports:
+      - "8787:8787"
+    volumes:
+      - ./:/app:ro
+    restart: unless-stopped

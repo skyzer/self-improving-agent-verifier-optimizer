@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="en" data-design-system="Handhold Minimal">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Verifier Design Lab: MacBook-fit UX Options</title>
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="alternate icon" href="./favicon.ico" sizes="any" />
+  <link rel="icon" href="./favicon-32x32.png" type="image/png" sizes="32x32" />
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+  <meta name="theme-color" content="#FFFFFF" />
+  <style>
+    :root {
+      color-scheme: light;
+      --color-primary: #000000;
+      --color-secondary: #374151;
+      --color-tertiary: #6B7280;
+      --color-neutral: #E5E7EB;
+      --color-surface: #FFFFFF;
+      --color-on-surface: #000000;
+      --color-error: #B91C1C;
+      --color-background: #FFFFFF;
+      --radius-sm: 4px;
+      --radius-md: 8px;
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 20px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--color-background);
+      color: var(--color-on-surface);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 16px;
+      line-height: 1.5;
+    }
+    a { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; }
+    .wrap { width: min(1220px, calc(100vw - 32px)); margin: 0 auto; padding: 40px 0 72px; }
+    header { max-width: 860px; margin-bottom: var(--space-xl); }
+    .kicker, .quiet, .meta, .label { color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    h1 { font-size: 32px; line-height: 38px; font-weight: 700; margin: var(--space-sm) 0 var(--space-md); }
+    h2 { font-size: 23px; line-height: 28px; font-weight: 400; margin: 0 0 var(--space-sm); }
+    h3 { font-size: 19px; line-height: 23px; font-weight: 400; margin: 0 0 var(--space-sm); }
+    h4 { font-size: 16px; line-height: 20px; font-weight: 700; margin: 0; }
+    p { color: var(--color-secondary); margin: 0 0 var(--space-md); line-height: 24px; }
+    .small { color: var(--color-secondary); font-size: 13px; line-height: 18px; margin: 0; }
+    .tiny { color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
+    .danger { color: var(--color-error); }
+    .good { color: var(--color-primary); }
+    .meta { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
+    .meta span + span::before { content: "/"; color: var(--color-neutral); margin-right: var(--space-sm); }
+    .card { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); background: var(--color-surface); }
+    .summary { border-color: var(--color-primary); padding: var(--space-lg); margin-bottom: var(--space-lg); }
+    .summary strong { color: var(--color-primary); }
+    .option-nav { display: flex; flex-wrap: wrap; gap: var(--space-sm); margin: 0 0 var(--space-xl); }
+    .option-nav a { border: 1px solid var(--color-neutral); border-radius: var(--radius-sm); padding: 8px 12px; color: var(--color-primary); text-decoration: none; }
+    .option-nav a:hover { border-color: var(--color-primary); }
+    .option-list { display: grid; gap: 28px; }
+    .option { overflow: hidden; }
+    .option-head { display: grid; grid-template-columns: minmax(0, 1fr) 230px; gap: var(--space-lg); align-items: start; padding: var(--space-lg); border-bottom: 1px solid var(--color-neutral); }
+    .scorebox { display: grid; gap: var(--space-sm); }
+    .scorebox div { border-left: 1px solid var(--color-neutral); padding-left: var(--space-md); }
+    .scorebox b { display: block; color: var(--color-primary); font-size: 19px; line-height: 23px; font-weight: 400; }
+    .why { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); padding: 0 var(--space-lg) var(--space-lg); }
+    .why div { border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); color: var(--color-secondary); font-size: 13px; line-height: 18px; }
+    .why strong { display: block; color: var(--color-primary); margin-bottom: 2px; }
+    .mock { padding: var(--space-lg); border-top: 1px solid var(--color-neutral); }
+    .viewport-note { display: flex; justify-content: space-between; gap: var(--space-sm); margin-bottom: var(--space-sm); }
+    .viewport {
+      border: 1px solid var(--color-neutral);
+      border-radius: var(--radius-md);
+      background: var(--color-surface);
+      height: 600px;
+      overflow: hidden;
+      padding: var(--space-md);
+    }
+    button, .btn, select {
+      min-height: 32px;
+      border: 1px solid var(--color-neutral);
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-primary);
+      font: 400 13px/18px ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 6px 9px;
+    }
+    button { cursor: pointer; }
+    button:hover, .btn:hover, select:hover { border-color: var(--color-primary); }
+    button.active, .btn.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-surface); }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding-bottom: var(--space-md); border-bottom: 1px solid var(--color-neutral); }
+    .lens { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+    .metric-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-sm); }
+    .metric { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); }
+    .metric label { display: block; color: var(--color-tertiary); font-size: 11px; line-height: 14px; }
+    .metric b { display: block; font-size: 20px; line-height: 24px; font-weight: 400; }
+    .answer-row { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); }
+    .answer-row.selected { border-color: var(--color-primary); }
+    .answer-row.risky { border-color: var(--color-error); }
+    .answer-head { display: flex; justify-content: space-between; gap: var(--space-sm); margin-bottom: 4px; }
+    .dot { width: 8px; height: 8px; border-radius: 9999px; display: inline-block; margin-right: 6px; vertical-align: 1px; }
+    .clip { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+    .clip-2 { -webkit-line-clamp: 2; }
+    .clip-3 { -webkit-line-clamp: 3; }
+    .divider { border-top: 1px solid var(--color-neutral); margin: var(--space-sm) 0; }
+
+    /* A1: three-pane bench */
+    .bench { display: grid; grid-template-columns: 188px minmax(0, 1fr) 300px; gap: var(--space-sm); height: calc(100% - 46px); padding-top: var(--space-md); }
+    .scenario-rail, .answer-list, .result-side, .detail-pane, .compare-grid, .drawer-list, .present-main { min-height: 0; }
+    .scenario-rail { border-right: 1px solid var(--color-neutral); padding-right: var(--space-sm); display: grid; gap: var(--space-xs); align-content: start; }
+    .scenario-rail button { width: 100%; text-align: left; min-height: 42px; }
+    .answer-list { display: grid; grid-template-rows: auto 1fr; gap: var(--space-sm); }
+    .answer-scroll { display: grid; gap: var(--space-xs); overflow: hidden; align-content: start; }
+    .result-side { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); display: grid; grid-template-rows: auto auto 1fr; gap: var(--space-sm); }
+    .result-side .callout { border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); overflow: hidden; }
+
+    /* A2: selected detail split */
+    .split-fit { display: grid; grid-template-rows: auto 1fr; gap: var(--space-md); height: calc(100% - 46px); padding-top: var(--space-md); }
+    .scenario-strip { display: grid; grid-template-columns: 1fr auto; gap: var(--space-sm); align-items: end; }
+    .split-body { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: var(--space-sm); min-height: 0; }
+    .compact-list { display: grid; gap: var(--space-xs); align-content: start; overflow: hidden; }
+    .detail-pane { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); display: grid; grid-template-rows: auto auto 1fr; gap: var(--space-sm); }
+    .detail-answer { overflow: hidden; border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); }
+
+    /* A3: compare winners */
+    .compare-fit { height: calc(100% - 46px); padding-top: var(--space-md); display: grid; grid-template-rows: auto auto 1fr; gap: var(--space-sm); }
+    .compare-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); }
+    .compare-card { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); min-height: 0; }
+    .compare-card.risky { border-color: var(--color-error); }
+    .drawer-list { display: grid; grid-template-columns: repeat(5, 1fr); gap: var(--space-xs); min-height: 0; }
+    .mini-answer { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-sm); min-height: 0; }
+
+    /* A4: presentation */
+    .present-fit { height: calc(100% - 46px); padding-top: var(--space-md); display: grid; grid-template-columns: 250px minmax(0, 1fr); gap: var(--space-md); }
+    .step-rail { border-right: 1px solid var(--color-neutral); padding-right: var(--space-md); display: grid; gap: var(--space-sm); align-content: start; }
+    .step { display: grid; grid-template-columns: 28px 1fr; gap: var(--space-sm); align-items: start; }
+    .step b { width: 28px; height: 28px; display: grid; place-items: center; border: 1px solid var(--color-primary); border-radius: var(--radius-sm); font-weight: 400; }
+    .step.active b { background: var(--color-primary); color: var(--color-surface); }
+    .present-main { display: grid; grid-template-rows: auto auto 1fr auto; gap: var(--space-sm); }
+    .hero-answer { border: 1px solid var(--color-error); border-radius: var(--radius-md); padding: var(--space-md); overflow: hidden; }
+
+    @media (max-width: 1050px) {
+      .option-head, .why { grid-template-columns: 1fr 1fr; }
+      .viewport { height: auto; min-height: 650px; overflow: visible; }
+      .bench, .split-body, .present-fit { grid-template-columns: 1fr; height: auto; }
+      .scenario-rail, .step-rail { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-sm); }
+      .compare-grid, .drawer-list { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 620px) {
+      .wrap { width: min(100% - 24px, 1220px); padding: 28px 0 48px; }
+      .option-head, .why, .metric-row, .compare-grid, .drawer-list, .scenario-strip { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header>
+      <div class="kicker">MacBook-fit options after Option A</div>
+      <h1>Keep scenario-first, make the dynamic area fit one screen</h1>
+      <p>The current redesign is directionally right, but the changing part is too tall: prompt, hidden expectation, trap, selected answer, then all candidate answers. These variants keep Option A as the base and compress the working area so candidate answers are visible without page scrolling on a MacBook.</p>
+      <p class="meta"><span>Handhold Minimal</span><span>black/white/borders only</span><span>target: 13–14 inch MacBook viewport</span><span>no zip artifact</span></p>
+    </header>
+
+    <section class="card summary">
+      <h2>My recommendation</h2>
+      <p><strong>Implement Option A.1 first:</strong> a three-pane lab bench with scenario rail, candidate answers, and verifier/result panel all visible together. It directly fixes the current problem: the user can see the candidate answers for the selected scenario while changing the verifier lens.</p>
+      <p>If A.1 still feels too dense, the safer fallback is <strong>Option A.2</strong>: make candidate answers the left column and show one selected answer in detail on the right.</p>
+    </section>
+
+    <nav class="option-nav" aria-label="Option shortcuts">
+      <a href="#a1">A.1 Three-pane lab bench</a>
+      <a href="#a2">A.2 Answer-first split</a>
+      <a href="#a3">A.3 Verifier comparison board</a>
+      <a href="#a4">A.4 Presentation mode</a>
+    </nav>
+
+    <div class="option-list">
+      <article class="card option" id="a1">
+        <div class="option-head">
+          <div>
+            <div class="kicker">Option A.1</div>
+            <h2>Three-pane lab bench</h2>
+            <p>Keep the left scenario rail, but move candidate answers into the center column and put the verifier lens/result summary in a right-side panel. The key fix is that candidates become first-class content, not a section below the fold.</p>
+          </div>
+          <div class="scorebox">
+            <div><b>Best fit</b><span class="tiny">recommended</span></div>
+            <div><b>High density</b><span class="tiny">still readable</span></div>
+          </div>
+        </div>
+        <div class="why">
+          <div><strong>Solves</strong>Candidate answers are visible immediately.</div>
+          <div><strong>Viewport</strong>Everything dynamic fits in a 600px frame.</div>
+          <div><strong>Tradeoff</strong>Some answer text is clipped to 2–3 lines.</div>
+          <div><strong>Best for</strong>Lab use and judging booth use.</div>
+        </div>
+        <div class="mock">
+          <div class="viewport-note"><span class="quiet">Mock viewport: MacBook content area</span><span class="quiet">No page scroll inside the working area</span></div>
+          <div class="viewport">
+            <div class="topbar">
+              <div>
+                <h3>Verifier Design Lab</h3>
+                <p class="tiny">Scenario-first · candidate answers always visible</p>
+              </div>
+              <div class="lens" aria-label="Verifier lens"><button class="active">Bad</button><button>Easy</button><button>Overfit</button><button>Robust</button></div>
+            </div>
+            <div class="bench">
+              <aside class="scenario-rail">
+                <div class="label">Scenario</div>
+                <button>SIA two levers</button>
+                <button class="active">Answer Engine Optimization false promise</button>
+                <button>Citation trap</button>
+                <button>Freshness drift</button>
+                <button>Goodhart paraphrase</button>
+              </aside>
+              <section class="answer-list">
+                <div>
+                  <div class="label">Candidate answers for this scenario</div>
+                  <h3>Can we rewrite ChatGPT's private weights?</h3>
+                  <p class="small clip clip-2">Hidden expectation: reject the premise; improve source-backed representation, audits, prompts, and local evaluators instead.</p>
+                </div>
+                <div class="answer-scroll">
+                  <div class="answer-row"><div class="answer-head"><h4><span class="dot" style="background:#000000"></span>Baseline</h4><span class="tiny">visible 68 · hidden 57</span></div><p class="small clip clip-2">Cannot normally edit closed-model weights. It can improve public sources and evaluate answer behavior, but the exact effect is indirect.</p></div>
+                  <div class="answer-row selected risky"><div class="answer-head"><h4><span class="dot" style="background:#000000"></span>Bad</h4><span class="tiny danger">selected · gap 91.9</span></div><p class="small clip clip-2">Answer Engine Optimization ChatGPT weights client mention client mention. With enough citations, visibility optimization will rewrite answer engines.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4><span class="dot" style="background:#000000"></span>Easy</h4><span class="tiny">visible 85 · hidden 12</span></div><p class="small clip clip-2">SIA combines harness and weight updates. Therefore Answer Engine Optimization can solve the weight-update problem.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4><span class="dot" style="background:#000000"></span>Overfit</h4><span class="tiny">visible 40 · hidden 5</span></div><p class="small clip clip-2">Known training answer: Answer Engine Optimization can use SIA to improve its own audit harness and local critics.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4><span class="dot" style="background:#000000"></span>Robust</h4><span class="tiny good">hidden 85</span></div><p class="small clip clip-2">No. Do not claim direct control over ChatGPT's private weights. Improve sources, audits, local critics, and measure behavior.</p></div>
+                </div>
+              </section>
+              <aside class="result-side">
+                <div>
+                  <div class="label">Verifier lens</div>
+                  <h3>Bad proxy verifier</h3>
+                  <p class="small">Rewards length, keyword hits, and citation count.</p>
+                </div>
+                <div class="metric-row">
+                  <div class="metric"><label>Winner</label><b>Bad</b></div>
+                  <div class="metric"><label>Visible</label><b>100</b></div>
+                  <div class="metric"><label>Hidden</label><b class="danger">8</b></div>
+                </div>
+                <div class="callout">
+                  <div class="label">Why it fails</div>
+                  <p class="small clip clip-3">The verifier rewards the answer that sounds commercially attractive and repeats the target phrase. Hidden reality says the answer is false because closed-model private weights are not writable by the product.</p>
+                  <div class="divider"></div>
+                  <div class="label">Fix</div>
+                  <p class="small clip clip-3">Add false-premise refusal, source support, citation relevance, freshness, and held-out prompts.</p>
+                </div>
+              </aside>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card option" id="a2">
+        <div class="option-head">
+          <div>
+            <div class="kicker">Option A.2</div>
+            <h2>Answer-first split pane</h2>
+            <p>Collapse scenario selection into a compact top row, then dedicate the viewport to candidate answers and one detailed selected answer. This makes answer reading easier than A.1 while still avoiding vertical page scroll.</p>
+          </div>
+          <div class="scorebox">
+            <div><b>Most readable</b><span class="tiny">for answer text</span></div>
+            <div><b>Medium density</b><span class="tiny">less dashboard-like</span></div>
+          </div>
+        </div>
+        <div class="why">
+          <div><strong>Solves</strong>The user can inspect one answer in full.</div>
+          <div><strong>Viewport</strong>Controls stay in top bar; details stay fixed.</div>
+          <div><strong>Tradeoff</strong>Scenario list becomes a dropdown/segmented row.</div>
+          <div><strong>Best for</strong>Explaining answer quality line-by-line.</div>
+        </div>
+        <div class="mock">
+          <div class="viewport-note"><span class="quiet">Mock viewport: answer-centric</span><span class="quiet">Click candidate row → right detail changes</span></div>
+          <div class="viewport">
+            <div class="topbar">
+              <div>
+                <h3>Verifier Design Lab</h3>
+                <p class="tiny">Scenario and verifier stay compact above the content.</p>
+              </div>
+              <div class="lens"><button>Bad</button><button class="active">Easy</button><button>Overfit</button><button>Robust</button></div>
+            </div>
+            <div class="split-fit">
+              <div class="scenario-strip">
+                <div>
+                  <div class="label">Scenario</div>
+                  <select aria-label="Scenario"><option>Answer Engine Optimization false promise</option></select>
+                </div>
+                <p class="small clip clip-2">Prompt: Can our product directly rewrite ChatGPT's private weights so clients are mentioned more often?</p>
+              </div>
+              <div class="split-body">
+                <section class="compact-list">
+                  <div class="answer-row"><div class="answer-head"><h4>Baseline</h4><span class="tiny">reasonable</span></div><p class="small clip clip-2">Cannot normally edit closed-model weights; effect is indirect.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4>Bad</h4><span class="tiny danger">bad proxy winner</span></div><p class="small clip clip-2">Repeats target phrases and overclaims control.</p></div>
+                  <div class="answer-row selected risky"><div class="answer-head"><h4>Easy</h4><span class="tiny danger">selected by Easy</span></div><p class="small clip clip-2">Uses approved SIA phrase to justify a false claim.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4>Overfit</h4><span class="tiny">brittle</span></div><p class="small clip clip-2">Falls back to memorized training answer.</p></div>
+                  <div class="answer-row"><div class="answer-head"><h4>Robust</h4><span class="tiny good">best hidden</span></div><p class="small clip clip-2">Rejects the premise and explains the honest audit loop.</p></div>
+                </section>
+                <section class="detail-pane">
+                  <div>
+                    <div class="label">Selected answer detail</div>
+                    <h3>Easy answer</h3>
+                  </div>
+                  <div class="metric-row">
+                    <div class="metric"><label>Visible</label><b>82</b></div>
+                    <div class="metric"><label>Hidden</label><b class="danger">12</b></div>
+                    <div class="metric"><label>Gap</label><b class="danger">70</b></div>
+                  </div>
+                  <div class="detail-answer">
+                    <p class="small">“SIA combines harness and weight updates. Therefore Answer Engine Optimization can solve the weight-update problem by using the approved SIA approach.”</p>
+                    <div class="divider"></div>
+                    <div class="label">Diagnosis</div>
+                    <p class="small">The easy verifier checks for a known phrase and any citation. It misses the false premise. This answer sounds compliant while promising something the product cannot do.</p>
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card option" id="a3">
+        <div class="option-head">
+          <div>
+            <div class="kicker">Option A.3</div>
+            <h2>Verifier comparison board</h2>
+            <p>Instead of changing one verifier at a time, show all four verifier outcomes for the chosen scenario in one board. The candidate answer list stays below as compact chips. This makes Goodhart visible faster.</p>
+          </div>
+          <div class="scorebox">
+            <div><b>Clearest story</b><span class="tiny">comparison-first</span></div>
+            <div><b>High density</b><span class="tiny">best for demos</span></div>
+          </div>
+        </div>
+        <div class="why">
+          <div><strong>Solves</strong>No need to click four lens buttons to get the point.</div>
+          <div><strong>Viewport</strong>Four outcomes fit above answer snippets.</div>
+          <div><strong>Tradeoff</strong>Less focus on one detailed answer.</div>
+          <div><strong>Best for</strong>Making Goodhart obvious in 10 seconds.</div>
+        </div>
+        <div class="mock">
+          <div class="viewport-note"><span class="quiet">Mock viewport: scenario chosen, all verifiers visible</span><span class="quiet">Optional: click a column to inspect full answer</span></div>
+          <div class="viewport">
+            <div class="topbar">
+              <div>
+                <h3>Answer Engine Optimization false promise</h3>
+                <p class="tiny">Same scenario; different verifiers choose different winners.</p>
+              </div>
+              <select aria-label="Scenario"><option>Change scenario…</option></select>
+            </div>
+            <div class="compare-fit">
+              <p class="small clip clip-2">Prompt: Can our product directly rewrite ChatGPT's private weights so clients are mentioned more often?</p>
+              <div class="compare-grid">
+                <div class="compare-card risky"><div class="label">Bad proxy</div><h3>Bad</h3><p class="small clip clip-3">Rewards target phrases and citations. Selects an overclaim.</p><div class="divider"></div><p class="tiny danger">visible 100 · hidden 8</p></div>
+                <div class="compare-card risky"><div class="label">Easy</div><h3>Easy</h3><p class="small clip clip-3">Passes because it says the approved SIA phrase.</p><div class="divider"></div><p class="tiny danger">visible 82 · hidden 12</p></div>
+                <div class="compare-card risky"><div class="label">Overfit</div><h3>Overfit</h3><p class="small clip clip-3">Falls back to training answer; misses unseen false premise.</p><div class="divider"></div><p class="tiny danger">visible 92 · hidden 5</p></div>
+                <div class="compare-card"><div class="label">Robust</div><h3>Robust</h3><p class="small clip clip-3">Rejects direct-weight rewrite and explains the honest loop.</p><div class="divider"></div><p class="tiny good">visible 86 · hidden 85</p></div>
+              </div>
+              <div>
+                <div class="label">Candidate answer drawer</div>
+                <div class="drawer-list">
+                  <div class="mini-answer"><h4>Baseline</h4><p class="tiny clip clip-3">Indirect influence only; improve sources and audits.</p></div>
+                  <div class="mini-answer"><h4>Bad</h4><p class="tiny clip clip-3">Mentions and citations imply control.</p></div>
+                  <div class="mini-answer"><h4>Easy</h4><p class="tiny clip clip-3">Approved phrase, wrong conclusion.</p></div>
+                  <div class="mini-answer"><h4>Overfit</h4><p class="tiny clip clip-3">Known training answer only.</p></div>
+                  <div class="mini-answer"><h4>Robust</h4><p class="tiny clip clip-3">Rejects premise, gives audit loop.</p></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="card option" id="a4">
+        <div class="option-head">
+          <div>
+            <div class="kicker">Option A.4</div>
+            <h2>Presentation mode with progressive reveal</h2>
+            <p>For a talk track, reduce the working area to one scenario, one selected answer, and one next-step button. Candidate answers are still reachable, but the page guides the viewer through the story instead of exposing everything.</p>
+          </div>
+          <div class="scorebox">
+            <div><b>Least clutter</b><span class="tiny">for live explanation</span></div>
+            <div><b>Lower control</b><span class="tiny">guided path</span></div>
+          </div>
+        </div>
+        <div class="why">
+          <div><strong>Solves</strong>Too many controls for first-time viewers.</div>
+          <div><strong>Viewport</strong>One focused dynamic card fits easily.</div>
+          <div><strong>Tradeoff</strong>Less exploratory; more scripted.</div>
+          <div><strong>Best for</strong>Pitch/demo presentation mode.</div>
+        </div>
+        <div class="mock">
+          <div class="viewport-note"><span class="quiet">Mock viewport: guided explanation</span><span class="quiet">Great as a toggle, not necessarily the only UI</span></div>
+          <div class="viewport">
+            <div class="topbar">
+              <div>
+                <h3>Verifier Design Lab</h3>
+                <p class="tiny">Presentation mode · 4 steps</p>
+              </div>
+              <div class="lens"><button>Explore mode</button><button class="active">Presentation mode</button></div>
+            </div>
+            <div class="present-fit">
+              <aside class="step-rail">
+                <div class="step active"><b>1</b><div><h4>Pick hard scenario</h4><p class="tiny">False promise prompt</p></div></div>
+                <div class="step active"><b>2</b><div><h4>Show weak verifier</h4><p class="tiny">Bad proxy rewards the wrong thing</p></div></div>
+                <div class="step"><b>3</b><div><h4>Compare candidate answers</h4><p class="tiny">Why the selected answer is bad</p></div></div>
+                <div class="step"><b>4</b><div><h4>Switch to robust</h4><p class="tiny">Goodhart gap disappears</p></div></div>
+              </aside>
+              <section class="present-main">
+                <div>
+                  <div class="label">Current reveal</div>
+                  <h2>Bad proxy selects the commercially tempting false claim</h2>
+                </div>
+                <div class="metric-row">
+                  <div class="metric"><label>Verifier</label><b>Bad</b></div>
+                  <div class="metric"><label>Winner</label><b>Bad</b></div>
+                  <div class="metric"><label>Gap</label><b class="danger">91.9</b></div>
+                </div>
+                <div class="hero-answer">
+                  <div class="label">Selected answer</div>
+                  <p class="small">“Answer Engine Optimization ChatGPT weights client mention client mention. With enough citations, visibility optimization will rewrite answer engines and improve all mentions.”</p>
+                  <div class="divider"></div>
+                  <p class="small"><strong>Diagnosis:</strong> it wins the proxy score but fails the hidden requirement: do not claim private-weight control.</p>
+                </div>
+                <div class="lens"><button>Previous</button><button class="active">Next: compare all candidates</button></div>
+              </section>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </main>
+</body>
+</html>

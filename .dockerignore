@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+build-test/
+verifier-design-lab-demo.zip
+.DS_Store
+.git/
