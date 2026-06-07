@@ -103,6 +103,14 @@ class VerifierLabTests(unittest.TestCase):
         self.assertNotIn("pill" + "-row", html)
         self.assertNotIn('class="' + "pill" + '"', html)
 
+    def test_checked_in_generated_outputs_match_generator(self):
+        out = ROOT / "build-test"
+        paths = verifier_lab.write_outputs(out)
+        generated_index = pathlib.Path(paths["index"]).read_text(encoding="utf-8")
+        generated_results = pathlib.Path(paths["results"]).read_text(encoding="utf-8")
+        self.assertEqual((ROOT / "index.html").read_text(encoding="utf-8"), generated_index)
+        self.assertEqual((ROOT / "data" / "results.json").read_text(encoding="utf-8"), generated_results)
+
     def test_favicon_assets_exist(self):
         for name in ["favicon.svg", "favicon.ico", "favicon-32x32.png", "apple-touch-icon.png", "favicon-512.png"]:
             with self.subTest(asset=name):
@@ -245,6 +253,87 @@ class VerifierLabTests(unittest.TestCase):
         self.assertIn("H→W", html)
         self.assertIn("oracle sandwich", html)
         self.assertIn("Do not train weights against a bad verifier", html)
+
+    def test_hands_on_learning_data_is_available(self):
+        for key in [
+            "failure_traces",
+            "real_world_scenarios",
+            "builder_checklist",
+            "playground_scenarios",
+            "quiz_questions",
+        ]:
+            self.assertIn(key, self.data)
+
+        traces = self.data["failure_traces"]
+        self.assertEqual(set(traces), {"bad_proxy", "easy_surface", "overfit_visible", "robust_guardrail"})
+        for verifier_id, trace in traces.items():
+            with self.subTest(verifier=verifier_id):
+                self.assertEqual([step["label"] for step in trace["steps"]], [
+                    "Agent proposes answer",
+                    "Verifier scores it",
+                    "Optimizer chases the score",
+                    "Hidden reality audit checks it",
+                    "Lever attribution chooses the next move",
+                ])
+                self.assertIn(trace["recommended_action"], {"H_THEN_W", "W"})
+        for verifier_id in ["bad_proxy", "easy_surface", "overfit_visible"]:
+            self.assertEqual(traces[verifier_id]["display_action"], "H→W")
+        self.assertEqual(traces["robust_guardrail"]["display_action"], "W")
+
+    def test_practical_learning_artifacts_are_grounded(self):
+        scenarios = self.data["real_world_scenarios"]
+        scenario_ids = {scenario["id"] for scenario in scenarios}
+        self.assertEqual(scenario_ids, {"code_agent", "rag_agent", "browser_agent", "llm_finetune"})
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario["id"]):
+                self.assertIn("bad_verifier", scenario)
+                self.assertIn("hidden_failure", scenario)
+                self.assertIn("correct_lever", scenario)
+                self.assertIn(scenario["correct_lever"], {"H", "H→W", "W"})
+
+        checklist = self.data["builder_checklist"]
+        self.assertGreaterEqual(len(checklist), 6)
+        joined = "\n".join(item["question"] for item in checklist)
+        self.assertIn("known-good answer", joined)
+        self.assertIn("visible-score gains", joined)
+
+        playground_ids = {scenario["id"] for scenario in self.data["playground_scenarios"]}
+        self.assertEqual(playground_ids, scenario_ids)
+
+        quizzes = self.data["quiz_questions"]
+        self.assertGreaterEqual(len(quizzes), 3)
+        for quiz in quizzes:
+            with self.subTest(quiz=quiz["id"]):
+                self.assertEqual(quiz["correct_choice"], "H→W")
+                self.assertIn("Fix", quiz["rationale"])
+
+    def test_hands_on_learning_ui_is_rendered(self):
+        out = ROOT / "build-test"
+        paths = verifier_lab.write_outputs(out)
+        html = pathlib.Path(paths["index"]).read_text(encoding="utf-8")
+        for marker in [
+            "Watch one self-improvement loop go wrong",
+            "failureTracePanel",
+            "renderFailureTrace",
+            "Bad verifier vs robust verifier",
+            "comparisonPanel",
+            "setComparisonVerifier",
+            "Real-world failure cards",
+            "Before you train weights, ask this",
+            "Mini playground",
+            "playgroundScenario",
+            "renderPlayground",
+            "This is not anti-training",
+            "What should the agent do next?",
+            "quizPanel",
+            "answerQuiz",
+            "Inspired by SIA-Lever framing",
+        ]:
+            self.assertIn(marker, html)
+        self.assertIn("verifier strictness", html)
+        self.assertIn("hidden audit strength", html)
+        self.assertIn("optimizer pressure", html)
+        self.assertIn("Train weights only after the harness", html)
 
 
 if __name__ == "__main__":

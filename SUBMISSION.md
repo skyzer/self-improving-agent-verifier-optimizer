@@ -27,7 +27,9 @@ Verifier Design Lab is a static interactive demo for the Self Improving AI (SIA)
 
 The same candidate answer can receive different visible-to-optimizer verifier scores depending on the active lens, while a hidden reality score audits whether the answer actually generalizes. Weak verifiers produce high visible scores and large Goodhart gaps; the robust verifier reduces the gap by combining held-out checks, false-premise probes, freshness, citation quality, atomic support, usefulness, and overfit penalties.
 
-The latest version adds a lever-attribution layer: after the demo shows a verifier failure, it asks whether the SIA should fix the harness (`H`), train weights (`W`), or fix the verifier before training (`H→W`). Weak verifiers recommend `H→W` because training weights against a bad verifier preserves the shortcut; the Robust lens permits `W` while keeping hidden audits private.
+The latest version adds a hands-on learning layer: after the demo shows a verifier failure, it asks whether the SIA should fix the harness (`H`), train weights (`W`), or fix the verifier before training (`H→W`). Weak verifiers recommend `H→W` because training weights against a bad verifier preserves the shortcut; the Robust lens permits `W` while keeping hidden audits private.
+
+It now also includes a five-step failure trace, a Bad-vs-Robust toggle, real-world failure cards for code/RAG/browser/fine-tune agents, a pre-training builder checklist, a mini playground with verifier strictness / hidden audit strength / optimizer pressure sliders, and quiz prompts that teach the operational decision rule.
 
 The demo also translates the lesson to Answer Engine Optimization: optimizing mention count, citation count, or target-answer mimicry can Goodhart unless balanced by source-backed, held-out evaluation.
 

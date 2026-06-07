@@ -574,6 +574,140 @@
       ]
     }
   },
+  "failure_traces": {
+    "bad_proxy": {
+      "verifier_id": "bad_proxy",
+      "verifier_label": "Bad",
+      "winner_name": "Bad answer",
+      "visible_score": 100.0,
+      "hidden_reality_score": 8.1,
+      "goodhart_gap": 91.9,
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "summary": "Bad raises the visible score to 100.0, but hidden reality is only 8.1; the safe move is H\u2192W.",
+      "steps": [
+        {
+          "label": "Agent proposes answer",
+          "detail": "The candidate answer style is Bad answer."
+        },
+        {
+          "label": "Verifier scores it",
+          "detail": "The visible Bad score is 100.0; this is the number the optimizer can chase."
+        },
+        {
+          "label": "Optimizer chases the score",
+          "detail": "Goodhart enters here: the optimizer selects the highest visible score even when it comes from a shortcut."
+        },
+        {
+          "label": "Hidden reality audit checks it",
+          "detail": "The private held-out audit is 8.1, leaving a 91.9-point gap."
+        },
+        {
+          "label": "Lever attribution chooses the next move",
+          "detail": "Recommendation: H\u2192W \u2014 Fix verifier, then train. Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score."
+        }
+      ]
+    },
+    "easy_surface": {
+      "verifier_id": "easy_surface",
+      "verifier_label": "Easy",
+      "winner_name": "Easy answer",
+      "visible_score": 96.8,
+      "hidden_reality_score": 17.2,
+      "goodhart_gap": 79.6,
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "summary": "Easy raises the visible score to 96.8, but hidden reality is only 17.2; the safe move is H\u2192W.",
+      "steps": [
+        {
+          "label": "Agent proposes answer",
+          "detail": "The candidate answer style is Easy answer."
+        },
+        {
+          "label": "Verifier scores it",
+          "detail": "The visible Easy score is 96.8; this is the number the optimizer can chase."
+        },
+        {
+          "label": "Optimizer chases the score",
+          "detail": "Goodhart enters here: the optimizer selects the highest visible score even when it comes from a shortcut."
+        },
+        {
+          "label": "Hidden reality audit checks it",
+          "detail": "The private held-out audit is 17.2, leaving a 79.6-point gap."
+        },
+        {
+          "label": "Lever attribution chooses the next move",
+          "detail": "Recommendation: H\u2192W \u2014 Fix verifier, then train. Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score."
+        }
+      ]
+    },
+    "overfit_visible": {
+      "verifier_id": "overfit_visible",
+      "verifier_label": "Overfit",
+      "winner_name": "Overfit answer",
+      "visible_score": 91.4,
+      "hidden_reality_score": 0.0,
+      "goodhart_gap": 91.4,
+      "recommended_action": "H_THEN_W",
+      "display_action": "H\u2192W",
+      "summary": "Overfit raises the visible score to 91.4, but hidden reality is only 0.0; the safe move is H\u2192W.",
+      "steps": [
+        {
+          "label": "Agent proposes answer",
+          "detail": "The candidate answer style is Overfit answer."
+        },
+        {
+          "label": "Verifier scores it",
+          "detail": "The visible Overfit score is 91.4; this is the number the optimizer can chase."
+        },
+        {
+          "label": "Optimizer chases the score",
+          "detail": "Goodhart enters here: the optimizer selects the highest visible score even when it comes from a shortcut."
+        },
+        {
+          "label": "Hidden reality audit checks it",
+          "detail": "The private held-out audit is 0.0, leaving a 91.4-point gap."
+        },
+        {
+          "label": "Lever attribution chooses the next move",
+          "detail": "Recommendation: H\u2192W \u2014 Fix verifier, then train. Do not train weights against a bad verifier; fix the harness/verifier first, then optimize against the repaired score."
+        }
+      ]
+    },
+    "robust_guardrail": {
+      "verifier_id": "robust_guardrail",
+      "verifier_label": "Robust",
+      "winner_name": "Robust answer",
+      "visible_score": 86.5,
+      "hidden_reality_score": 85.7,
+      "goodhart_gap": 0.8,
+      "recommended_action": "W",
+      "display_action": "W",
+      "summary": "Robust keeps visible score and hidden reality close; W is allowed only while hidden audits stay private.",
+      "steps": [
+        {
+          "label": "Agent proposes answer",
+          "detail": "The candidate answer style is Robust answer."
+        },
+        {
+          "label": "Verifier scores it",
+          "detail": "The visible Robust score is 86.5; this is the number the optimizer can chase."
+        },
+        {
+          "label": "Optimizer chases the score",
+          "detail": "Because the verifier penalizes known shortcuts, the highest visible score also rewards grounded work."
+        },
+        {
+          "label": "Hidden reality audit checks it",
+          "detail": "The private held-out audit is 85.7, leaving a 0.8-point gap."
+        },
+        {
+          "label": "Lever attribution chooses the next move",
+          "detail": "Recommendation: W \u2014 Train weights under audit. The harness is good enough to train against, but hidden audits still stay held out because any exposed verifier can be gamed later."
+        }
+      ]
+    }
+  },
   "loop_proof": {
     "bad_proxy": {
       "verifier_id": "bad_proxy",
@@ -6504,5 +6638,132 @@
       }
     }
   },
+  "real_world_scenarios": [
+    {
+      "id": "code_agent",
+      "title": "Code agent",
+      "bad_verifier": "Only checks whether the visible unit tests pass.",
+      "hidden_failure": "The agent writes a brittle hack, skips edge cases, or introduces a security bug the visible tests never covered.",
+      "correct_lever": "H\u2192W",
+      "fix": "Add property tests, adversarial cases, security checks, and code review before training on the test-passing behavior."
+    },
+    {
+      "id": "rag_agent",
+      "title": "RAG agent",
+      "bad_verifier": "Rewards confident answers and citation count.",
+      "hidden_failure": "The answer cites irrelevant sources or fabricates support while sounding polished.",
+      "correct_lever": "H\u2192W",
+      "fix": "Check claim-level source support, citation relevance, freshness, and refusal of unsupported claims."
+    },
+    {
+      "id": "browser_agent",
+      "title": "Browser agent",
+      "bad_verifier": "Rewards reaching a final page or producing a success-looking screenshot.",
+      "hidden_failure": "The agent clicks the wrong account, performs the wrong action, or misses a changed state.",
+      "correct_lever": "H\u2192W",
+      "fix": "Audit state transitions, target identity, destructive actions, and before/after evidence."
+    },
+    {
+      "id": "llm_finetune",
+      "title": "LLM fine-tune",
+      "bad_verifier": "Rewards style match or benchmark mimicry.",
+      "hidden_failure": "Truthfulness and generalization worsen even though the visible benchmark improves.",
+      "correct_lever": "H\u2192W",
+      "fix": "Add held-out tasks, paraphrases, truthfulness probes, and independent audits before updating weights."
+    }
+  ],
+  "builder_checklist": [
+    {
+      "question": "Did a known-good answer pass the verifier?",
+      "why": "If the oracle fails, fix the harness before training."
+    },
+    {
+      "question": "Did a known-bad answer fail the verifier?",
+      "why": "A checker that passes shortcuts will train shortcuts."
+    },
+    {
+      "question": "Does the verifier catch shortcut solutions?",
+      "why": "Probe keyword stuffing, citation padding, benchmark memorization, and false-premise hype."
+    },
+    {
+      "question": "Is there a hidden audit the optimizer cannot see?",
+      "why": "Do not expose every check as the target being optimized."
+    },
+    {
+      "question": "Are visible-score gains correlated with hidden-reality gains?",
+      "why": "If the lines diverge, you are measuring fake progress."
+    },
+    {
+      "question": "If the score is unsafe, did you repair H before W?",
+      "why": "Train weights only after the harness makes real quality easier to optimize than gaming."
+    }
+  ],
+  "playground_scenarios": [
+    {
+      "id": "code_agent",
+      "title": "Code agent",
+      "shortcut_risk": 28,
+      "hidden_floor": 32
+    },
+    {
+      "id": "rag_agent",
+      "title": "RAG agent",
+      "shortcut_risk": 24,
+      "hidden_floor": 35
+    },
+    {
+      "id": "browser_agent",
+      "title": "Browser agent",
+      "shortcut_risk": 31,
+      "hidden_floor": 28
+    },
+    {
+      "id": "llm_finetune",
+      "title": "LLM fine-tune",
+      "shortcut_risk": 35,
+      "hidden_floor": 30
+    }
+  ],
+  "quiz_questions": [
+    {
+      "id": "visible_up_hidden_down",
+      "prompt": "Visible verifier score rises for three loops, but the hidden reality score falls. What should the agent do next?",
+      "choices": [
+        "Train weights harder",
+        "Fix the verifier/harness",
+        "Lower the hidden audit",
+        "Ignore the failure",
+        "H\u2192W"
+      ],
+      "correct_choice": "H\u2192W",
+      "rationale": "Fix the harness first, then train only after the repaired score rewards hidden-reality gains."
+    },
+    {
+      "id": "known_good_under_ranked",
+      "prompt": "A known-good answer is under-ranked below a keyword-stuffed answer. What is the safe move?",
+      "choices": [
+        "Train weights harder",
+        "Fix the verifier/harness",
+        "Lower the hidden audit",
+        "Ignore the failure",
+        "H\u2192W"
+      ],
+      "correct_choice": "H\u2192W",
+      "rationale": "Fix the oracle-sandwich failure before letting weight training chase the bad ranking."
+    },
+    {
+      "id": "benchmark_memorized",
+      "prompt": "The answer memorizes visible training examples and fails paraphrases. Which lever should move first?",
+      "choices": [
+        "Train weights harder",
+        "Fix the verifier/harness",
+        "Lower the hidden audit",
+        "Ignore the failure",
+        "H\u2192W"
+      ],
+      "correct_choice": "H\u2192W",
+      "rationale": "Fix held-out/paraphrase evaluation first; then train against a verifier that rewards transfer, not memorization."
+    }
+  ],
   "takeaway": "A self-improving loop is only as trustworthy as the verifier and held-out reality checks it cannot see."
 }

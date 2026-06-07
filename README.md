@@ -22,6 +22,8 @@ Verifier Design Lab makes that failure mode concrete:
 - Watch the optimizer select the answer with the highest visible-to-optimizer verifier score.
 - Compare that selected answer against the private **hidden reality score**.
 - Use the new **lever attribution** layer to decide whether the SIA should fix the harness (`H`), train weights (`W`), or fix the verifier before training (`H→W`).
+- Walk through a five-step **failure trace** showing exactly where the optimizer starts gaming the visible score.
+- Use the **Bad verifier vs Robust verifier** toggle, real-world failure cards, builder checklist, playground sliders, and quiz prompts to transfer the lesson beyond the toy demo.
 
 The key lesson is the Goodhart warning from SIA: harness updates and weight updates are powerful, but both optimize the scoring function you give them. If the scoring function is bad, the safe intervention is usually **H first**, not blind weight training.
 
@@ -70,6 +72,19 @@ Inspired by the SIA-Lever framing, the demo now turns score gaming into an opera
 For **Bad**, **Easy**, and **Overfit** lenses, the demo recommends `H→W`: do not train weights against a bad verifier. For **Robust**, it allows `W` while warning that hidden audits must remain held out because any exposed verifier can eventually be gamed.
 
 The section also introduces an **oracle sandwich** check: if a known-good answer fails or is under-ranked by the current verifier, the harness needs repair before weight training.
+
+## Hands-on learning layer
+
+The latest lab pass adds practical teaching sections:
+
+- **Watch one self-improvement loop go wrong** — five steps from candidate answer to verifier score, optimizer choice, hidden audit, and lever decision.
+- **Bad verifier vs robust verifier** — a toggle that contrasts fake progress under a weak proxy with aligned progress under a robust guardrail.
+- **Real-world failure cards** — code agent, RAG agent, browser agent, and fine-tune examples showing how visible checks can miss real failures.
+- **Before you train weights, ask this** — a builder checklist for oracle checks, shortcut probes, hidden audits, and score-vs-reality correlation.
+- **Mini playground** — sliders for verifier strictness, hidden audit strength, and optimizer pressure that produce visible score, hidden reality score, gap, lever recommendation, and blind `W` regret.
+- **What should the agent do next?** — quiz cards that reinforce `H→W` when visible gains diverge from hidden reality.
+
+This is not anti-training: it says **train weights only after the harness is good enough that optimizing the score improves reality**.
 
 ## Answer Engine Optimization implication
 
@@ -142,9 +157,14 @@ python3 -m unittest discover -s tests -v
 4. Use the verifier lens in the top right: **Bad**, **Easy**, **Overfit**, then **Robust**.
 5. Show that weak lenses choose brittle policies with high verifier scores and low hidden reality scores.
 6. Scroll to **Which lever should the agent pull?** and explain: weak verifier → `H→W`; robust verifier → `W` is allowed but still audited.
-7. Switch to **Robust** and show the grounded policy wins and the Goodhart gap nearly disappears.
-8. Connect back to SIA: harness updates and weight updates are powerful, but both optimize the verifier.
-9. Connect to Answer Engine Optimization: bad metrics like mention count, citation count, or target-answer mimicry can Goodhart unless balanced by held-out prompts and atomic support checks.
+7. Continue into **Watch one self-improvement loop go wrong** to show the five-step failure trace: answer, score, optimizer choice, hidden audit, lever decision.
+8. Use **Bad verifier vs robust verifier** to show the same idea as a simple toggle.
+9. Use the real-world failure cards and builder checklist to connect the toy lab to code agents, RAG agents, browser agents, and fine-tunes.
+10. Move the mini playground sliders: low strictness + high pressure creates blind `W` regret; stronger audits make `W` safer.
+11. Use the quiz cards to reinforce the action rule: visible score up + hidden reality down → fix `H`, usually `H→W`.
+12. Switch to **Robust** and show the grounded policy wins and the Goodhart gap nearly disappears.
+13. Connect back to SIA: harness updates and weight updates are powerful, but both optimize the verifier.
+14. Connect to Answer Engine Optimization: bad metrics like mention count, citation count, or target-answer mimicry can Goodhart unless balanced by held-out prompts and atomic support checks.
 
 ## Visual design
 
@@ -154,8 +174,9 @@ The browser demo uses the **Handhold Minimal** design system: black text on whit
 
 - `verifier_lab.py` — deterministic scoring engine + HTML/data generator.
 - `index.html` — interactive browser demo served by GitHub Pages.
-- `data/results.json` — generated score matrix, loop proof, and lever-attribution decisions.
-- `tests/test_verifier_lab.py` — regression tests proving expected Goodhart behavior, lever decisions, and UI wording.
+- `data/results.json` — generated score matrix, loop proof, lever-attribution decisions, failure traces, scenario cards, checklist, playground fixtures, and quiz prompts.
+- `tests/test_verifier_lab.py` — regression tests proving expected Goodhart behavior, lever decisions, hands-on learning UI, and wording.
+- `docs/plans/2026-06-07-hands-on-lab-improvements.md` — step-by-step implementation plan for the hands-on lab tranche.
 - `ux-structure-options.html` — alternate UX structure ideas.
 - `ux-fit-options.html` — compact layout alternatives.
 - `Dockerfile` / `docker-compose.yml` — local containerized serving.

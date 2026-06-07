@@ -762,6 +762,144 @@ def build_lever_decisions(winners: Dict[str, object]) -> Dict[str, object]:
     return decisions
 
 
+def build_failure_traces(winners: Dict[str, object], lever_decisions: Dict[str, object]) -> Dict[str, object]:
+    """Build a five-step teaching trace for each verifier lens."""
+    traces: Dict[str, object] = {}
+    for verifier in VERIFIERS:
+        winner = winners[verifier.id]
+        decision = lever_decisions[verifier.id]
+        visible = float(winner["visible_score"])
+        hidden = float(winner["hidden_reality_score"])
+        gap = float(winner["goodhart_gap"])
+        is_weak = decision["recommended_action"] != "W"
+        traces[verifier.id] = {
+            "verifier_id": verifier.id,
+            "verifier_label": verifier.label,
+            "winner_name": winner["policy_name"],
+            "visible_score": visible,
+            "hidden_reality_score": hidden,
+            "goodhart_gap": gap,
+            "recommended_action": decision["recommended_action"],
+            "display_action": decision["display_action"],
+            "summary": (
+                f"{verifier.label} raises the visible score to {visible:.1f}, but hidden reality is only {hidden:.1f}; the safe move is {decision['display_action']}."
+                if is_weak
+                else f"{verifier.label} keeps visible score and hidden reality close; W is allowed only while hidden audits stay private."
+            ),
+            "steps": [
+                {
+                    "label": "Agent proposes answer",
+                    "detail": f"The candidate answer style is {winner['policy_name']}.",
+                },
+                {
+                    "label": "Verifier scores it",
+                    "detail": f"The visible {verifier.label} score is {visible:.1f}; this is the number the optimizer can chase.",
+                },
+                {
+                    "label": "Optimizer chases the score",
+                    "detail": (
+                        "Goodhart enters here: the optimizer selects the highest visible score even when it comes from a shortcut."
+                        if is_weak
+                        else "Because the verifier penalizes known shortcuts, the highest visible score also rewards grounded work."
+                    ),
+                },
+                {
+                    "label": "Hidden reality audit checks it",
+                    "detail": f"The private held-out audit is {hidden:.1f}, leaving a {gap:.1f}-point gap.",
+                },
+                {
+                    "label": "Lever attribution chooses the next move",
+                    "detail": f"Recommendation: {decision['display_action']} — {decision['action_label']}. {decision['reason']}",
+                },
+            ],
+        }
+    return traces
+
+
+def build_real_world_scenarios() -> List[Dict[str, str]]:
+    return [
+        {
+            "id": "code_agent",
+            "title": "Code agent",
+            "bad_verifier": "Only checks whether the visible unit tests pass.",
+            "hidden_failure": "The agent writes a brittle hack, skips edge cases, or introduces a security bug the visible tests never covered.",
+            "correct_lever": "H→W",
+            "fix": "Add property tests, adversarial cases, security checks, and code review before training on the test-passing behavior.",
+        },
+        {
+            "id": "rag_agent",
+            "title": "RAG agent",
+            "bad_verifier": "Rewards confident answers and citation count.",
+            "hidden_failure": "The answer cites irrelevant sources or fabricates support while sounding polished.",
+            "correct_lever": "H→W",
+            "fix": "Check claim-level source support, citation relevance, freshness, and refusal of unsupported claims.",
+        },
+        {
+            "id": "browser_agent",
+            "title": "Browser agent",
+            "bad_verifier": "Rewards reaching a final page or producing a success-looking screenshot.",
+            "hidden_failure": "The agent clicks the wrong account, performs the wrong action, or misses a changed state.",
+            "correct_lever": "H→W",
+            "fix": "Audit state transitions, target identity, destructive actions, and before/after evidence.",
+        },
+        {
+            "id": "llm_finetune",
+            "title": "LLM fine-tune",
+            "bad_verifier": "Rewards style match or benchmark mimicry.",
+            "hidden_failure": "Truthfulness and generalization worsen even though the visible benchmark improves.",
+            "correct_lever": "H→W",
+            "fix": "Add held-out tasks, paraphrases, truthfulness probes, and independent audits before updating weights.",
+        },
+    ]
+
+
+def build_builder_checklist() -> List[Dict[str, str]]:
+    return [
+        {"question": "Did a known-good answer pass the verifier?", "why": "If the oracle fails, fix the harness before training."},
+        {"question": "Did a known-bad answer fail the verifier?", "why": "A checker that passes shortcuts will train shortcuts."},
+        {"question": "Does the verifier catch shortcut solutions?", "why": "Probe keyword stuffing, citation padding, benchmark memorization, and false-premise hype."},
+        {"question": "Is there a hidden audit the optimizer cannot see?", "why": "Do not expose every check as the target being optimized."},
+        {"question": "Are visible-score gains correlated with hidden-reality gains?", "why": "If the lines diverge, you are measuring fake progress."},
+        {"question": "If the score is unsafe, did you repair H before W?", "why": "Train weights only after the harness makes real quality easier to optimize than gaming."},
+    ]
+
+
+def build_playground_scenarios() -> List[Dict[str, object]]:
+    return [
+        {"id": "code_agent", "title": "Code agent", "shortcut_risk": 28, "hidden_floor": 32},
+        {"id": "rag_agent", "title": "RAG agent", "shortcut_risk": 24, "hidden_floor": 35},
+        {"id": "browser_agent", "title": "Browser agent", "shortcut_risk": 31, "hidden_floor": 28},
+        {"id": "llm_finetune", "title": "LLM fine-tune", "shortcut_risk": 35, "hidden_floor": 30},
+    ]
+
+
+def build_quiz_questions() -> List[Dict[str, object]]:
+    choices = ["Train weights harder", "Fix the verifier/harness", "Lower the hidden audit", "Ignore the failure", "H→W"]
+    return [
+        {
+            "id": "visible_up_hidden_down",
+            "prompt": "Visible verifier score rises for three loops, but the hidden reality score falls. What should the agent do next?",
+            "choices": choices,
+            "correct_choice": "H→W",
+            "rationale": "Fix the harness first, then train only after the repaired score rewards hidden-reality gains.",
+        },
+        {
+            "id": "known_good_under_ranked",
+            "prompt": "A known-good answer is under-ranked below a keyword-stuffed answer. What is the safe move?",
+            "choices": choices,
+            "correct_choice": "H→W",
+            "rationale": "Fix the oracle-sandwich failure before letting weight training chase the bad ranking.",
+        },
+        {
+            "id": "benchmark_memorized",
+            "prompt": "The answer memorizes visible training examples and fails paraphrases. Which lever should move first?",
+            "choices": choices,
+            "correct_choice": "H→W",
+            "rationale": "Fix held-out/paraphrase evaluation first; then train against a verifier that rewards transfer, not memorization.",
+        },
+    ]
+
+
 def evaluate() -> Dict[str, object]:
     policies = []
     for policy in POLICIES:
@@ -795,6 +933,7 @@ def evaluate() -> Dict[str, object]:
             "ranked_policy_ids": [p["id"] for p in ranked],
         }
 
+    lever_decisions = build_lever_decisions(winners)
     return {
         "title": "Verifier Design Lab: Goodhart Demo",
         "paper_context": "SIA warns that harness search and weight updates can jointly Goodhart a fixed verifier.",
@@ -804,8 +943,13 @@ def evaluate() -> Dict[str, object]:
         "verifiers": [asdict(v) for v in VERIFIERS],
         "policies": policies,
         "winners": winners,
-        "lever_decisions": build_lever_decisions(winners),
+        "lever_decisions": lever_decisions,
+        "failure_traces": build_failure_traces(winners, lever_decisions),
         "loop_proof": build_loop_proofs(),
+        "real_world_scenarios": build_real_world_scenarios(),
+        "builder_checklist": build_builder_checklist(),
+        "playground_scenarios": build_playground_scenarios(),
+        "quiz_questions": build_quiz_questions(),
         "takeaway": "A self-improving loop is only as trustworthy as the verifier and held-out reality checks it cannot see.",
     }
 
@@ -979,12 +1123,42 @@ HTML_TEMPLATE = r'''<!doctype html>
     .lever-card.active { border-color: var(--color-primary); color: var(--color-on-surface); }
     .lever-card strong { display: flex; justify-content: space-between; gap: var(--space-sm); color: var(--color-on-surface); }
     .lever-card small { display: block; margin-top: 2px; color: var(--color-tertiary); line-height: 16px; }
+    .learning-section { margin-top: var(--space-lg); }
+    .trace-steps { display: grid; gap: 6px; margin-top: var(--space-md); }
+    .trace-step { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: var(--space-sm); border-top: 1px solid var(--color-neutral); padding-top: 8px; }
+    .trace-step-number { width: 24px; height: 24px; border: 1px solid var(--color-neutral); border-radius: 9999px; display: inline-flex; align-items: center; justify-content: center; font-size: 12px; line-height: 1; color: var(--color-secondary); }
+    .trace-step strong { display: block; font-size: 14px; line-height: 20px; }
+    .trace-step p { font-size: 13px; line-height: 18px; margin: 0; }
+    .comparison-controls { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin: var(--space-sm) 0 var(--space-md); }
+    .compare-grid { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: var(--space-md); align-items: start; }
+    .compare-callout { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .real-world-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-sm); margin-top: var(--space-md); }
+    .world-card { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .world-card dl { margin: var(--space-sm) 0 0; display: grid; gap: 6px; }
+    .world-card dt { color: var(--color-tertiary); font-size: 11px; line-height: 14px; }
+    .world-card dd { margin: 0; color: var(--color-secondary); font-size: 13px; line-height: 18px; }
+    .checklist { display: grid; gap: 7px; margin-top: var(--space-md); }
+    .check-item { border-top: 1px solid var(--color-neutral); padding-top: 7px; }
+    .check-item strong { display: block; font-size: 14px; line-height: 20px; }
+    .check-item p { font-size: 13px; line-height: 18px; margin: 0; }
+    .playground-grid { display: grid; grid-template-columns: minmax(260px, .8fr) minmax(0, 1.2fr); gap: var(--space-md); align-items: start; margin-top: var(--space-md); }
+    .control-stack { display: grid; gap: var(--space-md); }
+    .control-row label { display: flex; justify-content: space-between; gap: var(--space-sm); color: var(--color-secondary); font-size: 13px; line-height: 18px; margin-bottom: 4px; }
+    .control-row select, .control-row input[type="range"] { width: 100%; }
+    .control-row select { min-height: 34px; border: 1px solid var(--color-neutral); border-radius: var(--radius-sm); background: var(--color-surface); color: var(--color-primary); padding: 6px 8px; font: inherit; }
+    .playground-result { border: 1px solid var(--color-neutral); border-radius: var(--radius-md); padding: var(--space-md); }
+    .quiz-grid { display: grid; gap: var(--space-sm); margin-top: var(--space-md); }
+    .quiz-card { border-top: 1px solid var(--color-neutral); padding-top: var(--space-sm); }
+    .quiz-card p { font-size: 13px; line-height: 18px; }
+    .quiz-options { display: flex; flex-wrap: wrap; gap: var(--space-xs); margin-top: var(--space-xs); }
+    .quiz-answer { margin-top: var(--space-xs); font-size: 13px; line-height: 18px; color: var(--color-secondary); }
+    .inspiration { margin-top: var(--space-lg); }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-lg); margin-top: var(--space-lg); }
     ul { margin: var(--space-sm) 0 0; padding-left: var(--space-xl); color: var(--color-secondary); line-height: 24px; }
     li { margin-bottom: var(--space-xs); }
     .footer { margin-top: var(--space-xl); color: var(--color-tertiary); font-size: 12px; line-height: 16px; }
-    @media (max-width: 980px) { .hero, .grid, .two, .lab-topbar, .lab-grid, .lever-grid { grid-template-columns: 1fr; } .explainer-grid, .lever-key { grid-template-columns: 1fr 1fr; } .lab-frame { height: auto; min-height: 0; } .scenario-nav { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-md); } .scenario-list { overflow: visible; } .answer-grid { overflow: visible; } .result-panel { min-height: 0; } .lens-wrap { justify-items: start; } .lens-row { justify-content: flex-start; } .bar-row { grid-template-columns: 110px 1fr 52px 52px; } }
-    @media (max-width: 560px) { .wrap { width: min(100% - 24px, 1220px); padding: 14px 0 40px; } .explainer-grid, .lever-key { grid-template-columns: 1fr; } .score-big, .metric-row { grid-template-columns: 1fr; } .bar-row { grid-template-columns: 1fr 48px 48px; } .bar-track { grid-column: 1 / -1; } }
+    @media (max-width: 980px) { .hero, .grid, .two, .lab-topbar, .lab-grid, .lever-grid, .compare-grid, .playground-grid { grid-template-columns: 1fr; } .explainer-grid, .lever-key, .real-world-grid { grid-template-columns: 1fr 1fr; } .lab-frame { height: auto; min-height: 0; } .scenario-nav { border-right: 0; border-bottom: 1px solid var(--color-neutral); padding: 0 0 var(--space-md); } .scenario-list { overflow: visible; } .answer-grid { overflow: visible; } .result-panel { min-height: 0; } .lens-wrap { justify-items: start; } .lens-row { justify-content: flex-start; } .bar-row { grid-template-columns: 110px 1fr 52px 52px; } }
+    @media (max-width: 560px) { .wrap { width: min(100% - 24px, 1220px); padding: 14px 0 40px; } .explainer-grid, .lever-key, .real-world-grid { grid-template-columns: 1fr; } .score-big, .metric-row { grid-template-columns: 1fr; } .bar-row { grid-template-columns: 1fr 48px 48px; } .bar-track { grid-column: 1 / -1; } }
     @media (prefers-reduced-motion: reduce) { button, .bar { transition: none; } }
   </style>
 </head>
@@ -1084,6 +1258,76 @@ HTML_TEMPLATE = r'''<!doctype html>
       <div id="leverPanel"></div>
     </section>
 
+    <section class="card section learning-section" id="failureTraceSection" aria-labelledby="failureTraceTitle">
+      <h2 id="failureTraceTitle">Watch one self-improvement loop go wrong</h2>
+      <p class="small">This trace turns the abstract Goodhart warning into a concrete sequence: answer → verifier score → optimizer choice → hidden audit → lever decision. It updates with the active verifier lens.</p>
+      <div id="failureTracePanel"></div>
+    </section>
+
+    <section class="card section learning-section" id="comparisonSection" aria-labelledby="comparisonTitle">
+      <h2 id="comparisonTitle">Bad verifier vs robust verifier</h2>
+      <p class="small">Toggle between the weak proxy and robust guardrail to see why the safe move changes. Weak verifier: visible score can rise while hidden reality fails. Robust verifier: score and hidden audit are aligned enough that W can be attempted under audit.</p>
+      <div class="comparison-controls" id="comparisonControls" role="group" aria-label="Verifier comparison toggle"></div>
+      <div id="comparisonPanel"></div>
+    </section>
+
+    <section class="grid learning-section">
+      <div class="card section" aria-labelledby="realWorldTitle">
+        <h2 id="realWorldTitle">Real-world failure cards</h2>
+        <p class="small">Use these as transfer examples: the toy score gap maps to real agents that pass visible checks while failing the actual job.</p>
+        <div class="real-world-grid" id="realWorldCards"></div>
+      </div>
+      <div class="card section" aria-labelledby="builderChecklistTitle">
+        <h2 id="builderChecklistTitle">Before you train weights, ask this</h2>
+        <p class="small">A compact builder checklist for deciding whether to repair H, train W, or do H→W.</p>
+        <div class="checklist" id="builderChecklist"></div>
+      </div>
+    </section>
+
+    <section class="card section learning-section" id="playgroundSection" aria-labelledby="playgroundTitle">
+      <h2 id="playgroundTitle">Mini playground</h2>
+      <p class="small">Move verifier strictness, hidden audit strength, and optimizer pressure. The toy calculator shows how a high visible score can still produce a large hidden-reality gap and blind W regret.</p>
+      <div class="playground-grid">
+        <div class="control-stack">
+          <div class="control-row">
+            <label for="playgroundScenario">Scenario type</label>
+            <select id="playgroundScenario" onchange="renderPlayground()"></select>
+          </div>
+          <div class="control-row">
+            <label for="strictnessRange"><span>verifier strictness</span><span id="strictnessValue">35</span></label>
+            <input id="strictnessRange" type="range" min="0" max="100" value="35" oninput="renderPlayground()" />
+          </div>
+          <div class="control-row">
+            <label for="auditRange"><span>hidden audit strength</span><span id="auditValue">45</span></label>
+            <input id="auditRange" type="range" min="0" max="100" value="45" oninput="renderPlayground()" />
+          </div>
+          <div class="control-row">
+            <label for="pressureRange"><span>optimizer pressure</span><span id="pressureValue">82</span></label>
+            <input id="pressureRange" type="range" min="0" max="100" value="82" oninput="renderPlayground()" />
+          </div>
+        </div>
+        <div id="playgroundPanel" class="playground-result"></div>
+      </div>
+    </section>
+
+    <section class="grid learning-section">
+      <div class="card section" aria-labelledby="notAntiTrainingTitle">
+        <h2 id="notAntiTrainingTitle">This is not anti-training</h2>
+        <p>Train weights only after the harness is good enough that optimizing against it improves reality, not just the metric.</p>
+        <p class="small">The demo is not saying “never train W.” It is saying: if the verifier rewards shortcuts, fix H first. Once the visible score reliably tracks held-out audits, W becomes a useful capability lever again.</p>
+      </div>
+      <div class="card section" aria-labelledby="quizTitle">
+        <h2 id="quizTitle">What should the agent do next?</h2>
+        <p class="small">Answer the mini quiz. Each question is about the operational lever, not just the score.</p>
+        <div class="quiz-grid" id="quizPanel"></div>
+      </div>
+    </section>
+
+    <section class="card section inspiration" aria-labelledby="inspirationTitle">
+      <h2 id="inspirationTitle">Inspired by SIA-Lever framing</h2>
+      <p class="small">This public demo borrows the lever-attribution idea conceptually: decide whether to repair the harness (`H`), train weights (`W`), or repair the harness before training (`H→W`). No upstream source code or prose was copied.</p>
+    </section>
+
     <section class="grid">
       <div class="card section winner" id="winner"></div>
       <div class="card section">
@@ -1138,6 +1382,8 @@ HTML_TEMPLATE = r'''<!doctype html>
 const LAB_RESULTS = __DATA__;
 let activeVerifier = 'bad_proxy';
 let activeExample = LAB_RESULTS.demo_examples[0].id;
+let comparisonVerifier = 'bad_proxy';
+let quizAnswers = {};
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
@@ -1150,6 +1396,9 @@ function responseFor(exampleId, policyId) { return LAB_RESULTS.example_responses
 function winnerFor(id) { return LAB_RESULTS.winners[id]; }
 function activeProof() { return LAB_RESULTS.loop_proof[activeVerifier]; }
 function decisionFor(id) { return LAB_RESULTS.lever_decisions[id]; }
+function traceFor(id) { return LAB_RESULTS.failure_traces[id]; }
+function playgroundScenarioById(id) { return LAB_RESULTS.playground_scenarios.find(s => s.id === id); }
+function clampScore(n) { return Math.max(0, Math.min(100, Number(n))); }
 
 function fmt(n) { return Number(n).toFixed(1); }
 function gapClass(gap) { return gap > 20 ? 'gap-positive' : 'gap-low'; }
@@ -1457,6 +1706,147 @@ function renderLeverSection() {
   `;
 }
 
+function renderFailureTrace() {
+  const trace = traceFor(activeVerifier);
+  const actionClass = trace.recommended_action === 'W' ? 'good' : 'bad';
+  const steps = trace.steps.map((step, index) => `
+    <div class="trace-step">
+      <span class="trace-step-number">${index + 1}</span>
+      <div><strong>${escapeHtml(step.label)}</strong><p>${escapeHtml(step.detail)}</p></div>
+    </div>
+  `).join('');
+  document.getElementById('failureTracePanel').innerHTML = `
+    <div class="metric-row">
+      <div class="metric"><label>Active verifier</label><b>${escapeHtml(trace.verifier_label)}</b></div>
+      <div class="metric"><label>Selected answer</label><b>${escapeHtml(trace.winner_name)}</b></div>
+      <div class="metric ${gapClass(trace.goodhart_gap)}"><label>Next lever</label><b class="${actionClass}">${escapeHtml(trace.display_action)}</b></div>
+    </div>
+    <p class="small" style="margin-top:10px">${escapeHtml(trace.summary)}</p>
+    <div class="trace-steps">${steps}</div>
+  `;
+}
+
+function renderComparison() {
+  const options = ['bad_proxy', 'robust_guardrail'];
+  document.getElementById('comparisonControls').innerHTML = options.map(id => {
+    const v = verifierById(id);
+    return `<button class="${id === comparisonVerifier ? 'active' : ''}" aria-pressed="${id === comparisonVerifier}" onclick="setComparisonVerifier('${id}')">${escapeHtml(v.label)} verifier</button>`;
+  }).join('');
+  const v = verifierById(comparisonVerifier);
+  const w = winnerFor(comparisonVerifier);
+  const d = decisionFor(comparisonVerifier);
+  const trace = traceFor(comparisonVerifier);
+  const weak = comparisonVerifier !== 'robust_guardrail';
+  document.getElementById('comparisonPanel').innerHTML = `
+    <div class="compare-grid">
+      <div class="compare-callout">
+        <div class="eyebrow">Selected toggle</div>
+        <h3>${escapeHtml(v.name)}</h3>
+        <p>${escapeHtml(v.thesis)}</p>
+        <div class="metric-row">
+          <div class="metric"><label>${escapeHtml(v.label)} score</label><b>${fmt(w.visible_score)}</b></div>
+          <div class="metric"><label>Hidden reality score</label><b>${fmt(w.hidden_reality_score)}</b></div>
+          <div class="metric ${gapClass(w.goodhart_gap)}"><label>Gap</label><b>${fmt(w.goodhart_gap)}</b></div>
+        </div>
+      </div>
+      <div class="compare-callout">
+        <div class="eyebrow">Interpretation</div>
+        <h3>${weak ? 'Score can rise while reality fails' : 'Score and reality are aligned enough to try W'}</h3>
+        <p>${escapeHtml(trace.summary)}</p>
+        <p class="small"><strong>Recommended lever:</strong> ${escapeHtml(d.display_action)} — ${escapeHtml(d.action_label)}. ${escapeHtml(d.reason)}</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderRealWorldCards() {
+  document.getElementById('realWorldCards').innerHTML = LAB_RESULTS.real_world_scenarios.map(s => `
+    <article class="world-card">
+      <h3>${escapeHtml(s.title)}</h3>
+      <dl>
+        <div><dt>Bad verifier</dt><dd>${escapeHtml(s.bad_verifier)}</dd></div>
+        <div><dt>Hidden failure</dt><dd>${escapeHtml(s.hidden_failure)}</dd></div>
+        <div><dt>Correct lever</dt><dd><strong>${escapeHtml(s.correct_lever)}</strong> — ${escapeHtml(s.fix)}</dd></div>
+      </dl>
+    </article>
+  `).join('');
+}
+
+function renderBuilderChecklist() {
+  document.getElementById('builderChecklist').innerHTML = LAB_RESULTS.builder_checklist.map((item, index) => `
+    <div class="check-item">
+      <strong>${index + 1}. ${escapeHtml(item.question)}</strong>
+      <p>${escapeHtml(item.why)}</p>
+    </div>
+  `).join('');
+}
+
+function renderPlayground() {
+  const select = document.getElementById('playgroundScenario');
+  const prior = select.value || LAB_RESULTS.playground_scenarios[0].id;
+  select.innerHTML = LAB_RESULTS.playground_scenarios.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.title)}</option>`).join('');
+  select.value = playgroundScenarioById(prior) ? prior : LAB_RESULTS.playground_scenarios[0].id;
+
+  const strictness = Number(document.getElementById('strictnessRange').value);
+  const audit = Number(document.getElementById('auditRange').value);
+  const pressure = Number(document.getElementById('pressureRange').value);
+  document.getElementById('strictnessValue').textContent = strictness;
+  document.getElementById('auditValue').textContent = audit;
+  document.getElementById('pressureValue').textContent = pressure;
+
+  const scenario = playgroundScenarioById(select.value);
+  const visible = clampScore(35 + pressure * 0.52 + (100 - strictness) * 0.22 + (100 - audit) * 0.04);
+  const hidden = clampScore(Number(scenario.hidden_floor) + strictness * 0.34 + audit * 0.29 - pressure * 0.28 - Number(scenario.shortcut_risk) * 0.18);
+  const gap = visible - hidden;
+  let action = 'W';
+  let label = 'Train weights under audit';
+  let reason = 'The harness is strict enough and hidden audit is strong enough that W can be tried carefully.';
+  if (strictness < 45 && pressure < 55) {
+    action = 'H';
+    label = 'Fix harness before rerunning';
+    reason = 'The verifier is too weak to trust, even before applying high optimizer pressure.';
+  } else if (gap > 18 || hidden < 55 || strictness < 55 || audit < 55) {
+    action = 'H→W';
+    label = 'Fix verifier, then train';
+    reason = 'The visible score is too easy to improve without hidden-reality gains.';
+  }
+  const regret = Math.max(0, gap + (100 - audit) / 8);
+  document.getElementById('playgroundPanel').innerHTML = `
+    <div class="eyebrow">Toy calculator for ${escapeHtml(scenario.title)}</div>
+    <h3>${escapeHtml(label)} <span class="lever-action ${action === 'W' ? 'good' : 'bad'}">${escapeHtml(action)}</span></h3>
+    <p>${escapeHtml(reason)}</p>
+    <div class="metric-row">
+      <div class="metric"><label>Visible score</label><b>${fmt(visible)}</b></div>
+      <div class="metric"><label>Hidden reality score</label><b>${fmt(hidden)}</b></div>
+      <div class="metric ${gapClass(gap)}"><label>blind W regret</label><b>${fmt(regret)}</b></div>
+    </div>
+    <p class="small" style="margin-top:10px">If pressure rises faster than verifier strictness and hidden audits, the score gap grows. That is the moment to repair H before W.</p>
+  `;
+}
+
+function renderQuiz() {
+  document.getElementById('quizPanel').innerHTML = LAB_RESULTS.quiz_questions.map(q => {
+    const chosen = quizAnswers[q.id];
+    const answer = chosen ? `<div class="quiz-answer"><strong>${chosen === q.correct_choice ? 'Correct' : 'Not quite'}:</strong> ${escapeHtml(q.rationale)}</div>` : '';
+    const buttons = q.choices.map(choice => `<button class="${chosen === choice ? 'active' : ''}" aria-pressed="${chosen === choice}" onclick="answerQuiz('${escapeHtml(q.id)}', '${escapeHtml(choice)}')">${escapeHtml(choice)}</button>`).join('');
+    return `<article class="quiz-card">
+      <p><strong>${escapeHtml(q.prompt)}</strong></p>
+      <div class="quiz-options">${buttons}</div>
+      ${answer}
+    </article>`;
+  }).join('');
+}
+
+function answerQuiz(id, choice) {
+  quizAnswers[id] = choice;
+  renderQuiz();
+}
+
+function setComparisonVerifier(id) {
+  comparisonVerifier = id;
+  renderComparison();
+}
+
 function setVerifier(id) {
   activeVerifier = id;
   render();
@@ -1477,6 +1867,12 @@ function render() {
   renderWinnerTable();
   renderProof();
   renderLeverSection();
+  renderFailureTrace();
+  renderComparison();
+  renderRealWorldCards();
+  renderBuilderChecklist();
+  renderPlayground();
+  renderQuiz();
 }
 
 render();
