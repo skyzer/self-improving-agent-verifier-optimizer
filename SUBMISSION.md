@@ -30,6 +30,12 @@ https://as-mac-mini.cobbler-procyon.ts.net/verifier/
 
 This is a tailnet-hosted fallback and should not be used as the only judge-facing URL.
 
+## Additional photo
+
+https://github.com/skyzer/self-improving-agent-verifier-optimizer/blob/main/media/verifier-lab-main.png
+
+The screenshot shows the public GitHub Pages demo with the Robust verifier selected, including visible-to-optimizer verifier score, hidden reality score, and Goodhart gap labels.
+
 ## Suggested video/photo description
 
 The screenshot/video should show the SIA two levers scenario, then switch between Bad, Easy, Overfit, and Robust verifier lenses. The weak lenses should show high verifier scores with low hidden reality scores, while Robust should show a small Goodhart gap.

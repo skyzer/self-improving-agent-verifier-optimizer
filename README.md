@@ -6,6 +6,7 @@ Interactive Goodhart demo for the **Self Improving AI (SIA) Agents** hackathon.
 - **Repository:** https://github.com/skyzer/self-improving-agent-verifier-optimizer
 - **Temporary local/tailnet demo:** https://as-mac-mini.cobbler-procyon.ts.net/verifier/
 - **Submission tracks:** Research Track, Applied AI Track
+- **Additional photo:** https://github.com/skyzer/self-improving-agent-verifier-optimizer/blob/main/media/verifier-lab-main.png
 
 ## What it shows
 
@@ -143,7 +144,7 @@ The browser demo uses the **Handhold Minimal** design system: black text on whit
 - `ux-fit-options.html` — compact layout alternatives.
 - `Dockerfile` / `docker-compose.yml` — local containerized serving.
 - `SUBMISSION.md` — Oatmeal submission copy.
-- `media/` — optional screenshots/video for judging materials.
+- `media/verifier-lab-main.png` — public screenshot/additional photo for judging materials.
 
 ## License
 
