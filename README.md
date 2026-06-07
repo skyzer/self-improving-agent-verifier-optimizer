@@ -4,7 +4,6 @@ Interactive Goodhart demo for the **Self Improving AI (SIA) Agents** hackathon.
 
 - **Live demo:** https://skyzer.github.io/self-improving-agent-verifier-optimizer/
 - **Repository:** https://github.com/skyzer/self-improving-agent-verifier-optimizer
-- **Temporary local/tailnet demo:** https://as-mac-mini.cobbler-procyon.ts.net/verifier/
 - **Submission tracks:** Research Track, Applied AI Track
 - **Additional photos:**
   - Overfit failure: https://github.com/skyzer/self-improving-agent-verifier-optimizer/raw/main/media/01-overfit-goodhart-gap.png

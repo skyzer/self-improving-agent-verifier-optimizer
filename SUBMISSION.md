@@ -37,12 +37,6 @@ https://github.com/skyzer/self-improving-agent-verifier-optimizer
 
 https://skyzer.github.io/self-improving-agent-verifier-optimizer/
 
-## Temporary fallback demo
-
-https://as-mac-mini.cobbler-procyon.ts.net/verifier/
-
-This is a tailnet-hosted fallback and should not be used as the only judge-facing URL.
-
 ## Additional photos
 
 Overfit failure / large gap:
